@@ -4,6 +4,9 @@ require:
   - rubocop-ordered_methods
   - rubocop-rspec
   - rubocop-thread_safety
+  - rubocop-factory_bot
+  - rubocop-rails
+  - rubocop-rspec_rails
 AllCops:
   TargetRubyVersion: 3.1
   Exclude:

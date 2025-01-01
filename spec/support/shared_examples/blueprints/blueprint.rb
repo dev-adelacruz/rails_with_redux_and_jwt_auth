@@ -6,8 +6,8 @@ RSpec.shared_examples 'a blueprint' do
     JSON.parse(described_class.render(record), symbolize_names: true)
   end
   let(:stringified_values) do
-    stringifiable_keys.each_with_object({}) do |key, hash|
-      hash[key] = record[key].to_s
+    stringifiable_keys.index_with do |key|
+      record[key].to_s
     end
   end
   describe '#render' do
