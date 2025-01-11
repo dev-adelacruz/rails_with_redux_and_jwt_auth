@@ -42,6 +42,7 @@ gem 'blueprinter'
 # Authentication
 gem 'devise'
 gem 'devise-jwt'
+gem 'rack-cors'
 
 # React
 gem 'vite_rails'

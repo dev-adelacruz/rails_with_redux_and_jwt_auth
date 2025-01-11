@@ -27,6 +27,25 @@ paths:
                   type: string
                 password_confirmation:
                   type: string
+  "/api/v1/users/sign_in":
+    post:
+      summary: creates new user session
+      tags:
+      - Sessions
+      parameters: []
+      responses:
+        '200':
+          description: logins new user successfully
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
 servers:
 - url: https://{defaultHost}
   variables:
