@@ -48,4 +48,42 @@ RSpec.describe 'Sessions' do
       end
     end
   end
+
+  describe '#destroy' do # rubocop:disable RSpec/EmptyExampleGroup
+    path '/api/v1/users/sign_out' do
+      delete 'logs out user' do
+        tags 'Sessions'
+        consumes 'application/json'
+        parameter name: :Authorization, in: :header, type: :string
+
+        response(200, 'logins new user successfully') do
+          let(:user) do
+            create(
+              :user,
+              email: 'test@email.com',
+              password: 'password',
+              password_confirmation: 'password'
+            )
+          end
+
+          let(:Authorization) do
+            payload = { sub: user.id }
+            JWT.encode(
+              payload,
+              Rails.application.credentials.devise_jwt_secret_key!,
+              'HS256'
+            )
+          end
+
+          run_test! do |response|
+            expect(response).to have_http_status :ok
+            expect(json_response).to include(
+              message: 'Logged out successfully.',
+              status: 200
+            )
+          end
+        end
+      end
+    end
+  end
 end
