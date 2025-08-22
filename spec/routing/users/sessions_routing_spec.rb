@@ -20,4 +20,10 @@ RSpec.describe 'Sessions Routing' do
 
     it { is_expected.to route_to(controller: 'api/v1/users/sessions', action: 'destroy') }
   end
+
+  describe '#validate_token' do
+    subject { get('/api/v1/users/validate_token') }
+
+    it { is_expected.to route_to(controller: 'api/v1/users/sessions', action: 'validate_token') }
+  end
 end

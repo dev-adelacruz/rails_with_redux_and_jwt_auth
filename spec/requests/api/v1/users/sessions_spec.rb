@@ -54,9 +54,8 @@ RSpec.describe 'Sessions' do
       delete 'logs out user' do
         tags 'Sessions'
         consumes 'application/json'
-        parameter name: :Authorization, in: :header, type: :string
 
-        response(200, 'logins new user successfully') do
+        response(200, 'logouts new user successfully') do
           let(:user) do
             create(
               :user,
@@ -66,13 +65,8 @@ RSpec.describe 'Sessions' do
             )
           end
 
-          let(:Authorization) do
-            payload = { sub: user.id }
-            JWT.encode(
-              payload,
-              Rails.application.credentials.devise_jwt_secret_key!,
-              'HS256'
-            )
+          before do
+            sign_in user
           end
 
           run_test! do |response|
@@ -81,6 +75,40 @@ RSpec.describe 'Sessions' do
               message: 'Logged out successfully.',
               status: 200
             )
+          end
+        end
+      end
+    end
+  end
+
+  describe '#validate_token' do # rubocop:disable RSpec/EmptyExampleGroup
+    path '/api/v1/users/validate_token' do
+      get 'validates user token' do
+        tags 'Sessions'
+        consumes 'application/json'
+
+        response(200, 'validates user token') do
+          let(:user) do
+            create(
+              :user,
+              email: 'test@email.com',
+              password: 'password',
+              password_confirmation: 'password'
+            )
+          end
+
+          before do
+            sign_in user
+          end
+
+          run_test! do |response|
+            expect(response).to have_http_status :ok
+          end
+        end
+
+        response(401, 'validates user token if it doesn not exist') do
+          run_test! do |response|
+            expect(response).to have_http_status :unauthorized
           end
         end
       end
