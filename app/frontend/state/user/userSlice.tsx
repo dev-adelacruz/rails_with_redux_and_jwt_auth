@@ -38,25 +38,18 @@ export const checkAuthStatus = createAsyncThunk(
   'user/checkAuth',
   async (_, { rejectWithValue }) => {
     try {
-      console.log('checkAuthStatus: Checking token...');
       const token = await tokenStorage.getToken();
-      console.log('checkAuthStatus: Token found?', !!token);
       
       if (token) {
-        console.log('checkAuthStatus: Validating token...');
         const isValid = await authService.validateToken(token);
-        console.log('checkAuthStatus: Token valid?', isValid);
         
         if (isValid) {
-          console.log('checkAuthStatus: Token is valid, returning user data');
           // For now, return only the token; user data can be fetched separately if needed
           return { token, user: null };
         }
       }
-      console.log('checkAuthStatus: No valid token found');
       return null;
     } catch (error: any) {
-      console.error('checkAuthStatus: Error occurred', error);
       return rejectWithValue(error.message || 'Auth check failed');
     }
   }
@@ -130,19 +123,16 @@ const userSlice = createSlice({
         state.isSignedIn = true
         state.token = action.payload.token
         state.user = action.payload.user
-        console.log('userSlice: Auth status updated - signed in with token:', action.payload.token ? 'yes' : 'no')
       } else {
         state.isSignedIn = false
         state.token = null
         state.user = null
-        console.log('userSlice: Auth status updated - signed out')
       }
       state.error = null
     })
     builder.addCase(checkAuthStatus.rejected, (state, action) => {
       state.isLoading = false
       state.error = action.payload as string
-      console.log('userSlice: Auth check rejected with error:', action.payload)
     })
   }
 })

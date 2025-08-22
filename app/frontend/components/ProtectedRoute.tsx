@@ -13,13 +13,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
-    console.log('ProtectedRoute - State updated - isSignedIn:', isSignedIn, 'isLoading:', isLoading);
-    
     // Mark that auth check has completed when loading finishes
     if (!isLoading) {
       setAuthChecked(true);
     }
-  }, [isSignedIn, isLoading]);
+  }, [isLoading]);
 
   // Show loading state while checking authentication
   if (isLoading) {
@@ -28,7 +26,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
   // Only redirect if auth check has completed and user is not signed in
   if (authChecked && !isSignedIn) {
-    console.log('Redirecting to login - user not authenticated');
     return <Navigate to="/login" replace />;
   }
 
@@ -37,7 +34,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     return <div>Loading...</div>;
   }
 
-  console.log('Rendering protected content');
   return <>{children}</>;
 };
 
