@@ -82,7 +82,7 @@ const HomePage: React.FC = () => {
         </nav>
 
         <header className="dashboard-header">
-          <h1>Welcome, {user?.email || 'User'}!</h1>
+          <h1>Welcome, User {user?.id}!</h1>
           <p>Here's your dashboard overview</p>
         </header>
 

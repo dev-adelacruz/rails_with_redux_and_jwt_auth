@@ -5,15 +5,16 @@ export interface LoginCredentials {
 }
 
 export interface AuthResponse {
-  token: string;
-  user: {
-    id: number;
-    email: string;
-    // Add other user fields as needed
-  };
-  expires_in?: number;
+  status: {
+    message: string;
+    data: {
+      user: {
+        id: number;
+        email: string;
+      }
+    }
+  }
 }
-
 export interface ApiError {
   message: string;
   status?: number;
@@ -66,7 +67,7 @@ class AuthService {
     }
   }
 
-  async validateToken(token: string): Promise<boolean> {
+  async validateToken(token: string): Promise<AuthResponse> {
     try {
       const response = await fetch(`${this.baseURL}/users/validate_token`, {
         method: 'GET',
@@ -78,13 +79,16 @@ class AuthService {
 
       console.log('Token validation response status:', response.status);
       if (!response.ok) {
-        console.log('Token validation failed with status:', response.status);
-        return false;
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Validation of token failed with status ${response.status}`);
       }
-      return true;
+      const data: AuthResponse = await response.json();
+      return data;
     } catch (error) {
-      console.error('Token validation error:', error);
-      return false;
+      if (error instanceof Error) {
+        throw new Error(error.message);
+      }
+      throw new Error('An unexpected error occurred during validation of token');
     }
   }
 

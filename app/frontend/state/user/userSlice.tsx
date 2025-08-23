@@ -41,12 +41,9 @@ export const checkAuthStatus = createAsyncThunk(
       const token = await tokenStorage.getToken();
       
       if (token) {
-        const isValid = await authService.validateToken(token);
+        const validateTokenResponse = await authService.validateToken(token);
         
-        if (isValid) {
-          // For now, return only the token; user data can be fetched separately if needed
-          return { token, user: null };
-        }
+        return validateTokenResponse;
       }
       return null;
     } catch (error: any) {
@@ -88,8 +85,7 @@ const userSlice = createSlice({
     builder.addCase(loginUser.fulfilled, (state, action) => {
       state.isLoading = false
       state.isSignedIn = true
-      state.token = action.payload.token
-      state.user = action.payload.user
+      state.user = action.payload.status.data.user
       state.error = null
     })
     builder.addCase(loginUser.rejected, (state, action) => {
@@ -121,8 +117,7 @@ const userSlice = createSlice({
       state.isLoading = false
       if (action.payload) {
         state.isSignedIn = true
-        state.token = action.payload.token
-        state.user = action.payload.user
+        state.user = action.payload.status.data.user
       } else {
         state.isSignedIn = false
         state.token = null
