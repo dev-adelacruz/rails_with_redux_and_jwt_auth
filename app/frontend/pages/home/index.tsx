@@ -2,8 +2,8 @@ import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { logoutUser } from '../../state/user/userSlice';
 import { RootState } from '../../state/store';
-import { HomeIcon, BarChartIcon, FileTextIcon, GearIcon } from '@radix-ui/react-icons';
-import { Card, Button, Flex, Text } from '@radix-ui/themes';
+import { HomeIcon, BarChartIcon, FileTextIcon, GearIcon, PersonIcon, ExitIcon } from '@radix-ui/react-icons';
+import { Card, Button, Flex, Text, Avatar, DropdownMenu } from '@radix-ui/themes';
 import './index.css';
 
 const HomePage: React.FC = () => {
@@ -42,14 +42,45 @@ const HomePage: React.FC = () => {
           </ul>
         </nav>
         <div className="sidebar-footer">
-          <Button onClick={handleLogout} color="red" variant="soft" style={{ width: '100%' }}>
-            Logout
-          </Button>
+          {/* Logout button removed as per request */}
         </div>
       </aside>
 
       {/* Main Content */}
       <main className="main-content">
+        {/* Navbar */}
+        <nav className="navbar">
+          <Flex justify="between" align="center" style={{ width: '100%' }}>
+            <div></div> {/* Spacer for alignment */}
+            <DropdownMenu.Root>
+              <DropdownMenu.Trigger>
+                <Button variant="ghost" style={{ padding: 0, borderRadius: '50%' }}>
+                  <Avatar
+                    size="3"
+                    radius="full"
+                    fallback={user?.email?.charAt(0).toUpperCase() || 'U'}
+                  />
+                </Button>
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Content align="end" sideOffset={5}>
+                <DropdownMenu.Item>
+                  <Flex align="center" gap="2">
+                    <PersonIcon />
+                    <Text size="2">Profile</Text>
+                  </Flex>
+                </DropdownMenu.Item>
+                <DropdownMenu.Separator />
+                <DropdownMenu.Item color="red" onClick={handleLogout}>
+                  <Flex align="center" gap="2">
+                    <ExitIcon />
+                    <Text size="2">Logout</Text>
+                  </Flex>
+                </DropdownMenu.Item>
+              </DropdownMenu.Content>
+            </DropdownMenu.Root>
+          </Flex>
+        </nav>
+
         <header className="dashboard-header">
           <h1>Welcome, {user?.email || 'User'}!</h1>
           <p>Here's your dashboard overview</p>
