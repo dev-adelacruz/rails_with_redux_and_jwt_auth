@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import LoginForm from '../../components/auth/LoginForm';
+import './index.css';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -17,8 +18,7 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="login-page">
-      <h1>Login</h1>
+    <div className="login-page-container">
       <LoginForm 
         onSuccess={handleLoginSuccess}
         onError={handleLoginError}
