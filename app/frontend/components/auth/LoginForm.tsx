@@ -3,6 +3,18 @@ import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '../../state/store';
 import { loginUser, clearError } from '../../state/user/userSlice';
 import { tokenStorage } from '../../services/tokenStorage';
+import {
+  Box,
+  TextField,
+  FormControlLabel,
+  Checkbox,
+  Button,
+  Paper,
+  Typography,
+  Alert,
+  CircularProgress
+} from '@mui/material';
+import { LockOutlined } from '@mui/icons-material';
 
 interface LoginFormProps {
   onSuccess: () => void;
@@ -40,47 +52,78 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onError }) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="login-form">
-      <div className="form-group">
-        <label htmlFor="email">Email:</label>
-        <input
-          type="email"
+    <Paper elevation={3} sx={{ padding: 4, maxWidth: 400, margin: 'auto' }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 3 }}>
+        <LockOutlined sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
+        <Typography component="h1" variant="h5" sx={{ fontWeight: 'bold' }}>
+          Sign In
+        </Typography>
+      </Box>
+
+      <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
+        <TextField
+          margin="normal"
+          required
+          fullWidth
           id="email"
+          label="Email Address"
+          name="email"
+          autoComplete="email"
+          autoFocus
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          required
           disabled={isLoading}
+          variant="outlined"
+          sx={{ mb: 2 }}
         />
-      </div>
-
-      <div className="form-group">
-        <label htmlFor="password">Password:</label>
-        <input
+        
+        <TextField
+          margin="normal"
+          required
+          fullWidth
+          name="password"
+          label="Password"
           type="password"
           id="password"
+          autoComplete="current-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          required
           disabled={isLoading}
+          variant="outlined"
+          sx={{ mb: 2 }}
         />
-      </div>
-
-      <div className="form-group">
-        <label>
-          <input
-            type="checkbox"
-            checked={rememberMe}
-            onChange={(e) => setRememberMe(e.target.checked)}
-            disabled={isLoading}
-          />
-          Remember me
-        </label>
-      </div>
-
-      <button type="submit" disabled={isLoading}>
-        {isLoading ? 'Logging in...' : 'Login'}
-      </button>
-    </form>
+        
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              color="primary"
+              disabled={isLoading}
+            />
+          }
+          label="Remember me"
+          sx={{ mb: 2 }}
+        />
+        
+        <Button
+          type="submit"
+          fullWidth
+          variant="contained"
+          disabled={isLoading}
+          sx={{ 
+            mt: 3, 
+            mb: 2, 
+            py: 1.5,
+            fontSize: '1rem',
+            fontWeight: 'bold'
+          }}
+          startIcon={isLoading ? <CircularProgress size={20} /> : null}
+        >
+          {isLoading ? 'Signing In...' : 'Sign In'}
+        </Button>
+      </Box>
+    </Paper>
   );
 };
 
