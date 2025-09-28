@@ -14,10 +14,15 @@
     "vite-tsconfig-paths": "^5.1.4"
   },
   "dependencies": {
+    "@tailwindcss/vite": "^4.1.13",
     "react": "^18.1.0",
     "react-dom": "^18.0.5",
     "react-router-dom": "^7.6.2",
     "styled-components": "^5.1.30",
+    "tailwindcss": "^4.1.13",
     "vite-plugin-ruby": "^5.1.1"
+  },
+  "scripts": {
+    "tailwind-init": "tailwindcss init -p"
   }
 }
