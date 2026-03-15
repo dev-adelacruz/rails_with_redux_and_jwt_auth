@@ -961,59 +961,23 @@ create_file "app/blueprints/user_blueprint.rb" do
   RUBY
 end
 
-# Routes
+# ── Phase 1 routes: skeleton only — no devise_for, no draw(:api) ──
+# Generators (devise:install, devise User) boot Rails to introspect routes.
+# If devise_for :users or draw(:api) are present at that point, Rails calls
+# const_get('User') before the model exists and crashes. The full routes are
+# written in after_bundle (Phase 2) once the User model and DB are ready.
 remove_file "config/routes.rb"
 create_file "config/routes.rb" do
   <<~RUBY
     # frozen_string_literal: true
 
     Rails.application.routes.draw do
-      mount Rswag::Api::Engine => '/api-docs'
-      mount Rswag::Ui::Engine => '/api-docs'
-      draw(:api)
-
       get 'up' => 'rails/health#show', as: :rails_health_check
-
-      get '/*anyPath', to: 'root#index', anyPath: /(?!api).*/
     end
   RUBY
 end
 
 empty_directory "config/routes"
-create_file "config/routes/api.rb" do
-  <<~RUBY
-    # frozen_string_literal: true
-
-    namespace :api do
-      draw(:v1)
-    end
-  RUBY
-end
-
-create_file "config/routes/v1.rb" do
-  <<~RUBY
-    # frozen_string_literal: true
-
-    namespace :v1 do
-      draw(:devise)
-    end
-  RUBY
-end
-
-create_file "config/routes/devise.rb" do
-  <<~RUBY
-    # frozen_string_literal: true
-
-    devise_for :users, singular: :user, controllers: {
-      registrations: 'api/v1/users/registrations',
-      sessions: 'api/v1/users/sessions'
-    }
-
-    devise_scope :user do
-      get 'users/validate_token', to: 'users/sessions#validate_token'
-    end
-  RUBY
-end
 
 # CORS initializer
 create_file "config/initializers/cors.rb" do
@@ -1163,12 +1127,67 @@ create_file "swagger/v1/swagger.yaml" do
   YAML
 end
 
-# ── Post-bundle: DB + credentials + JWT config ────────────────
-# Runs after `bundle install` completes. Order matters:
-#   1. DB created/migrated so Rails can resolve the User constant
-#   2. Credential written before the JWT initializer is appended
-#   3. JWT config appended last — safe to use the bang method now
+# ── Post-bundle: Phase 2 routes + DB + credentials + JWT config ──
+# Strict order required:
+#   1. Full routes written — User model now exists on disk
+#   2. DB created + migrated — User constant resolvable at runtime
+#   3. Credential written — no KeyError when initializer loads
+#   4. JWT config appended — bang method safe, credential is present
 after_bundle do
+  # ── Phase 2: write full routes now that User model exists ──
+  say "== Writing full routes (Phase 2) ==", :green
+
+  create_file "config/routes.rb", force: true do
+    <<~RUBY
+      # frozen_string_literal: true
+
+      Rails.application.routes.draw do
+        mount Rswag::Api::Engine => '/api-docs'
+        mount Rswag::Ui::Engine => '/api-docs'
+        draw(:api)
+
+        get 'up' => 'rails/health#show', as: :rails_health_check
+
+        get '/*anyPath', to: 'root#index', anyPath: /(?!api).*/
+      end
+    RUBY
+  end
+
+  create_file "config/routes/api.rb" do
+    <<~RUBY
+      # frozen_string_literal: true
+
+      namespace :api do
+        draw(:v1)
+      end
+    RUBY
+  end
+
+  create_file "config/routes/v1.rb" do
+    <<~RUBY
+      # frozen_string_literal: true
+
+      namespace :v1 do
+        draw(:devise)
+      end
+    RUBY
+  end
+
+  create_file "config/routes/devise.rb" do
+    <<~RUBY
+      # frozen_string_literal: true
+
+      devise_for :users, singular: :user, controllers: {
+        registrations: 'api/v1/users/registrations',
+        sessions: 'api/v1/users/sessions'
+      }
+
+      devise_scope :user do
+        get 'users/validate_token', to: 'users/sessions#validate_token'
+      end
+    RUBY
+  end
+
   say "== Creating and migrating database ==", :green
   rails_command "db:create db:migrate"
 
