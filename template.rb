@@ -1075,31 +1075,8 @@ create_file "app/models/user.rb" do
   RUBY
 end
 
-# Append JWT config to Devise initializer
-append_to_file "config/initializers/devise.rb" do
-  <<~RUBY
-
-    Devise.setup do |config|
-      config.jwt do |jwt|
-        jwt.secret = Rails.application.credentials.devise_jwt_secret_key!
-        jwt.dispatch_requests = [
-          ['POST', %r{^/login$}]
-        ]
-        jwt.revocation_requests = [
-          ['DELETE', %r{^/logout$}]
-        ]
-        jwt.expiration_time = 5.minutes.to_i
-      end
-    end
-  RUBY
-end
-
-# Generate devise_jwt_secret_key credential
-say "== Adding devise_jwt_secret_key to credentials ==", :green
-run "bundle exec rails runner \"require 'securerandom'; " \
-    "creds = Rails.application.credentials; " \
-    "creds[:devise_jwt_secret_key] = SecureRandom.hex(64); " \
-    "creds.write\""
+# JWT config + credential writing deferred to after_bundle so Rails can boot cleanly
+# (db must exist and credential must be written BEFORE the jwt config is loaded)
 
 # ── RSpec ─────────────────────────────────────────────────────
 say "== Installing RSpec ==", :green
@@ -1186,6 +1163,38 @@ create_file "swagger/v1/swagger.yaml" do
   YAML
 end
 
+# ── Post-bundle: DB + credentials + JWT config ────────────────
+# Runs after `bundle install` completes. Order matters:
+#   1. DB created/migrated so Rails can resolve the User constant
+#   2. Credential written before the JWT initializer is appended
+#   3. JWT config appended last — safe to use the bang method now
+after_bundle do
+  say "== Creating and migrating database ==", :green
+  rails_command "db:create db:migrate"
+
+  say "== Writing devise_jwt_secret_key credential ==", :green
+  rails_command "runner \"Rails.application.credentials.tap { |c| c[:devise_jwt_secret_key] = SecureRandom.hex(64) }.write\""
+
+  say "== Appending JWT config to Devise initializer ==", :green
+  append_to_file "config/initializers/devise.rb" do
+    <<~RUBY
+
+      Devise.setup do |config|
+        config.jwt do |jwt|
+          jwt.secret = Rails.application.credentials.devise_jwt_secret_key!
+          jwt.dispatch_requests = [
+            ['POST', %r{^/login$}]
+          ]
+          jwt.revocation_requests = [
+            ['DELETE', %r{^/logout$}]
+          ]
+          jwt.expiration_time = 5.minutes.to_i
+        end
+      end
+    RUBY
+  end
+end
+
 # ── Final instructions ────────────────────────────────────────
 say "", :green
 say "================================================================", :green
@@ -1193,14 +1202,12 @@ say "  Template applied successfully!", :green
 say "================================================================", :green
 say ""
 say "Next steps:"
-say "  1. rails db:create db:migrate"
-say "  2. Add devise_jwt_secret_key to your credentials:"
-say "     rails credentials:edit"
-say "     devise_jwt_secret_key: <run `rails secret` to generate>"
-say "  3. Start the dev server:"
+say "  1. Start the dev server:"
 say "     bin/dev  (requires Foreman: gem install foreman)"
-say "  4. Rename the app:"
+say "  2. Rename the app:"
 say "     rails app:rename[MyNewAppName]"
+say ""
+say "  (db:create, db:migrate, and credentials were set up automatically)"
 say ""
 say "URLs:"
 say "  App:     http://localhost:3000"
