@@ -17,12 +17,13 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="login-page">
-      <h1>Login</h1>
-      <LoginForm 
-        onSuccess={handleLoginSuccess}
-        onError={handleLoginError}
-      />
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="w-full max-w-md px-4">
+        <LoginForm
+          onSuccess={handleLoginSuccess}
+          onError={handleLoginError}
+        />
+      </div>
     </div>
   );
 };
