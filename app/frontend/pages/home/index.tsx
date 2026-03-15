@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { logoutUser } from '../../state/user/userSlice';
 import { RootState } from '../../state/store';
@@ -60,6 +60,8 @@ const navItems = [
 const HomePage: React.FC = () => {
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.user.user);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const handleLogout = () => {
     dispatch(logoutUser() as any);
@@ -72,6 +74,16 @@ const HomePage: React.FC = () => {
   const today = new Date().toLocaleDateString('en-US', {
     weekday: 'long', month: 'long', day: 'numeric',
   });
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -103,25 +115,6 @@ const HomePage: React.FC = () => {
           ))}
         </nav>
 
-        {/* User section */}
-        <div className="px-3 py-4 border-t border-gray-700/60 space-y-1">
-          <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-gray-800/60">
-            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-xs font-bold shrink-0">
-              {initials}
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-white truncate">{user?.email}</p>
-              <p className="text-xs text-gray-500">Administrator</p>
-            </div>
-          </div>
-          <button
-            onClick={handleLogout}
-            className="flex items-center w-full px-3 py-2.5 text-sm font-medium text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-colors duration-150"
-          >
-            <LogOut className="w-4.5 h-4.5 mr-3 shrink-0" />
-            Sign out
-          </button>
-        </div>
       </aside>
 
       {/* Main content */}
@@ -139,14 +132,56 @@ const HomePage: React.FC = () => {
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white" />
             </button>
 
-            {/* User pill */}
-            <button className="flex items-center gap-2.5 pl-1 pr-3 py-1 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors duration-150">
-              <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-blue-600 text-xs font-bold text-white">
-                {initials}
-              </div>
-              <span className="text-sm font-medium text-gray-700 max-w-[140px] truncate">{user?.email}</span>
-              <ChevronDown className="w-4 h-4 text-gray-400" />
-            </button>
+            {/* User pill + dropdown */}
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setDropdownOpen((prev) => !prev)}
+                className="flex items-center gap-2.5 pl-1 pr-3 py-1.5 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors duration-150"
+              >
+                <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-blue-600 text-xs font-bold text-white shrink-0">
+                  {initials}
+                </div>
+                <div className="flex flex-col items-start min-w-0">
+                  <span className="text-sm font-medium text-gray-700 max-w-[140px] truncate leading-tight">{user?.email}</span>
+                  <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 px-1.5 py-px rounded-full leading-tight tracking-wide">Administrator</span>
+                </div>
+                <ChevronDown className={`w-4 h-4 text-gray-400 shrink-0 transition-transform duration-150 ${dropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {/* Dropdown panel */}
+              {dropdownOpen && (
+                <div className="absolute right-0 mt-2 w-52 bg-white rounded-xl border border-gray-200 shadow-lg shadow-gray-200/60 overflow-hidden z-50">
+                  {/* Account info header */}
+                  <div className="px-4 py-3 border-b border-gray-100">
+                    <p className="text-xs text-gray-400">Signed in as</p>
+                    <p className="text-sm font-medium text-gray-800 truncate">{user?.email}</p>
+                  </div>
+
+                  {/* Menu items */}
+                  <div className="py-1">
+                    <button className="flex items-center w-full gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors duration-150">
+                      <User className="w-4 h-4 text-gray-400 shrink-0" />
+                      Profile
+                    </button>
+                    <button className="flex items-center w-full gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors duration-150">
+                      <Settings className="w-4 h-4 text-gray-400 shrink-0" />
+                      Settings
+                    </button>
+                  </div>
+
+                  {/* Divider + Sign out */}
+                  <div className="border-t border-gray-100 py-1">
+                    <button
+                      onClick={handleLogout}
+                      className="flex items-center w-full gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors duration-150"
+                    >
+                      <LogOut className="w-4 h-4 shrink-0" />
+                      Sign out
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
