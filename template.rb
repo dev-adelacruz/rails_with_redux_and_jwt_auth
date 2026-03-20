@@ -1593,36 +1593,34 @@ create_file "swagger/v1/swagger.yaml" do
   YAML
 end
 
-# ── Post-bundle: DB + credentials + JWT config ──
+# ── DB + credentials + JWT config ────────────────────────────
 # Strict order required:
-#   1. DB created + migrated — User constant resolvable at runtime
-#   2. Credential written — no KeyError when initializer loads
+#   1. DB created + migrated — migrations are on disk, no initializer JWT yet
+#   2. Credential written — no KeyError when initializer loads next
 #   3. JWT config appended — bang method safe, credential is present
-after_bundle do
-  say "== Creating and migrating database ==", :green
-  rails_command "db:create db:migrate"
+say "== Creating and migrating database ==", :green
+rails_command "db:create db:migrate"
 
-  say "== Writing devise_jwt_secret_key credential ==", :green
-  rails_command "runner \"Rails.application.credentials.tap { |c| c[:devise_jwt_secret_key] = SecureRandom.hex(64) }.write\""
+say "== Writing devise_jwt_secret_key credential ==", :green
+rails_command "runner \"Rails.application.credentials.tap { |c| c[:devise_jwt_secret_key] = SecureRandom.hex(64) }.write\""
 
-  say "== Appending JWT config to Devise initializer ==", :green
-  append_to_file "config/initializers/devise.rb" do
-    <<~RUBY
+say "== Appending JWT config to Devise initializer ==", :green
+append_to_file "config/initializers/devise.rb" do
+  <<~RUBY
 
-      Devise.setup do |config|
-        config.jwt do |jwt|
-          jwt.secret = Rails.application.credentials.devise_jwt_secret_key!
-          jwt.dispatch_requests = [
-            ['POST', %r{^/login$}]
-          ]
-          jwt.revocation_requests = [
-            ['DELETE', %r{^/logout$}]
-          ]
-          jwt.expiration_time = 5.minutes.to_i
-        end
+    Devise.setup do |config|
+      config.jwt do |jwt|
+        jwt.secret = Rails.application.credentials.devise_jwt_secret_key!
+        jwt.dispatch_requests = [
+          ['POST', %r{^/login$}]
+        ]
+        jwt.revocation_requests = [
+          ['DELETE', %r{^/logout$}]
+        ]
+        jwt.expiration_time = 5.minutes.to_i
       end
-    RUBY
-  end
+    end
+  RUBY
 end
 
 # ── Final instructions ────────────────────────────────────────
