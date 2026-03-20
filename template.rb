@@ -1269,7 +1269,7 @@ create_file "app/controllers/api/v1/users/registrations_controller.rb" do
           }
         else
           render json: {
-            message: "User couldn't be created successfully. #{current_user.errors.full_messages.to_sentence}"
+            message: "User couldn't be created successfully. \#{current_user.errors.full_messages.to_sentence}"
           }, status: :unprocessable_entity
         end
       end

@@ -36,7 +36,7 @@ entries = {}
 
 source.scan(/create_file\s+["']([^"']+)["'][^<\n]*\n\s*<<~(\w+)\n(.*?)\n[ \t]*\2/m) do |path, _delim, raw|
   next if FILTER && !path.start_with?(FILTER)
-  entries[path] = squiggly_strip(raw).rstrip + "\n"
+  entries[path] = squiggly_strip(raw).gsub('\#{', '#{').rstrip + "\n"
 end
 
 if entries.empty?
