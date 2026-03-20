@@ -1602,7 +1602,16 @@ say "== Creating and migrating database ==", :green
 rails_command "db:create db:migrate"
 
 say "== Writing devise_jwt_secret_key credential ==", :green
-rails_command "runner \"Rails.application.credentials.tap { |c| c[:devise_jwt_secret_key] = SecureRandom.hex(64) }.write\""
+# Rails 8.1: credentials.write requires the content as an argument.
+# Use File.write/delete directly to avoid create_file tracking.
+credential_script = File.join(destination_root, "tmp/write_credential.rb")
+File.write(credential_script, <<~RUBY)
+  current = Rails.application.credentials.read.to_s.chomp
+  secret  = SecureRandom.hex(64)
+  Rails.application.credentials.write(current + "\\ndevise_jwt_secret_key: " + secret + "\\n")
+RUBY
+rails_command "runner tmp/write_credential.rb"
+File.delete(credential_script)
 
 say "== Appending JWT config to Devise initializer ==", :green
 append_to_file "config/initializers/devise.rb" do
