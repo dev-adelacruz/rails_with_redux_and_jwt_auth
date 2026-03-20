@@ -1520,6 +1520,377 @@ create_file "spec/models/user_spec.rb" do
   RUBY
 end
 
+create_file "spec/blueprints/user_blueprint_spec.rb" do
+  <<~RUBY
+    # frozen_string_literal: true
+    require 'rails_helper'
+    require './spec/support/shared_examples/blueprints/blueprint'
+
+    RSpec.describe UserBlueprint do
+      describe '#render' do
+        let(:record) { create(:user) }
+
+        it_behaves_like 'a blueprint' do
+          let(:expected_keys) { %i[email id] }
+        end
+      end
+    end
+  RUBY
+end
+
+create_file "spec/requests/api/v1/users/registrations_spec.rb" do
+  <<~RUBY
+    # frozen_string_literal: true
+
+    require 'swagger_helper'
+
+    RSpec.describe 'Registrations' do
+      let(:json_response) { JSON.parse(response.body, symbolize_names: true) }
+
+      describe '#create' do # rubocop:disable RSpec/EmptyExampleGroup
+        path '/api/v1/users' do
+          post 'registers new users' do
+            tags 'Registrations'
+            consumes 'application/json'
+            parameter name: :params, in: :body, schema: {
+              type: :object,
+              properties: {
+                email: { type: :string },
+                password: { type: :string },
+                password_confirmation: { type: :string },
+              }
+            }
+
+            response(200, 'register new user successfully') do
+              let(:params) do
+                {
+                  user: {
+                    email: 'sample@email.com',
+                    password: '12345678',
+                    password_confirmation: '12345678'
+                  }
+                }
+              end
+
+              run_test! do |response|
+                expect(response).to have_http_status :ok
+                expect(json_response).to include(
+                  data: include(email: 'sample@email.com'),
+                  status: include(code: 200, message: 'Signed up successfully.')
+                )
+              end
+            end
+
+            response(422, 'registration failed because email is malformed') do
+              let(:params) do
+                {
+                  user: {
+                    email: 'sample.com',
+                    password: '12345678',
+                    password_confirmation: '12345678'
+                  }
+                }
+              end
+
+              run_test! do |response|
+                expect(response).to have_http_status :unprocessable_entity
+                expect(json_response).to include(
+                  message: "User couldn't be created successfully. Email is invalid"
+                )
+              end
+            end
+
+            response(422, 'registration failed because passwords do not match') do
+              let(:params) do
+                {
+                  user: {
+                    email: 'sample@email.com',
+                    password: '12345678',
+                    password_confirmation: '123456789'
+                  }
+                }
+              end
+
+              run_test! do |response|
+                expect(response).to have_http_status :unprocessable_entity
+                expect(json_response).to include(
+                  message: "User couldn't be created successfully. Password confirmation doesn't match Password"
+                )
+              end
+            end
+
+            response(422, 'registration failed because user already exists') do
+              let(:params) do
+                {
+                  user: {
+                    email: 'sample@email.com',
+                    password: '12345678',
+                    password_confirmation: '12345678'
+                  }
+                }
+              end
+
+              before do
+                create(:user, email: 'sample@email.com', password: '12345678', password_confirmation: '12345678')
+              end
+
+              run_test! do |response|
+                expect(response).to have_http_status :unprocessable_entity
+                expect(json_response).to include(
+                  message: "User couldn't be created successfully. Email has already been taken"
+                )
+              end
+            end
+          end
+        end
+      end
+    end
+  RUBY
+end
+
+create_file "spec/requests/api/v1/users/sessions_spec.rb" do
+  <<~RUBY
+    # frozen_string_literal: true
+
+    require 'swagger_helper'
+
+    RSpec.describe 'Sessions' do
+      let(:json_response) { JSON.parse(response.body, symbolize_names: true) }
+
+      describe '#create' do # rubocop:disable RSpec/EmptyExampleGroup
+        path '/api/v1/users/sign_in' do
+          post 'creates new user session' do
+            tags 'Sessions'
+            consumes 'application/json'
+            parameter name: :params, in: :body, schema: {
+              type: :object,
+              properties: {
+                email: { type: :string },
+                password: { type: :string },
+              }
+            }
+
+            response(200, 'logins new user successfully') do
+              let(:params) do
+                {
+                  user: {
+                    email: 'sample@email.com',
+                    password: '12345678',
+                  }
+                }
+              end
+
+              before do
+                create(:user, email: 'sample@email.com', password: '12345678')
+              end
+
+              run_test! do |response|
+                expect(response).to have_http_status :ok
+                expect(json_response).to include(
+                  status: include(
+                    code: 200,
+                    data: include(
+                      user: include(email: 'sample@email.com')
+                    ),
+                    message: 'Logged in successfully.',
+                  )
+                )
+              end
+            end
+          end
+        end
+      end
+
+      describe '#destroy' do # rubocop:disable RSpec/EmptyExampleGroup
+        path '/api/v1/users/sign_out' do
+          delete 'logs out user' do
+            tags 'Sessions'
+            consumes 'application/json'
+
+            response(200, 'logouts new user successfully') do
+              let(:user) do
+                create(
+                  :user,
+                  email: 'test@email.com',
+                  password: 'password',
+                  password_confirmation: 'password'
+                )
+              end
+
+              before do
+                sign_in user
+              end
+
+              run_test! do |response|
+                expect(response).to have_http_status :ok
+                expect(json_response).to include(
+                  message: 'Logged out successfully.',
+                  status: 200
+                )
+              end
+            end
+          end
+        end
+      end
+
+      describe '#validate_token' do # rubocop:disable RSpec/EmptyExampleGroup
+        path '/api/v1/users/validate_token' do
+          get 'validates user token' do
+            tags 'Sessions'
+            consumes 'application/json'
+
+            response(200, 'validates user token') do
+              let(:user) do
+                create(
+                  :user,
+                  email: 'test@email.com',
+                  password: 'password',
+                  password_confirmation: 'password'
+                )
+              end
+
+              before do
+                sign_in user
+              end
+
+              run_test! do |response|
+                expect(response).to have_http_status :ok
+              end
+            end
+
+            response(401, 'validates user token if it doesn not exist') do
+              run_test! do |response|
+                expect(response).to have_http_status :unauthorized
+              end
+            end
+          end
+        end
+      end
+    end
+  RUBY
+end
+
+create_file "spec/routing/users/sessions_routing_spec.rb" do
+  <<~RUBY
+    # frozen_string_literal: true
+
+    require 'rails_helper'
+
+    RSpec.describe 'Sessions Routing' do
+      describe '#new' do
+        subject { get('/api/v1/users/sign_in') }
+
+        it { is_expected.to route_to(controller: 'api/v1/users/sessions', action: 'new') }
+      end
+
+      describe '#create' do
+        subject { post('/api/v1/users/sign_in') }
+
+        it { is_expected.to route_to(controller: 'api/v1/users/sessions', action: 'create') }
+      end
+
+      describe '#destroy' do
+        subject { delete('/api/v1/users/sign_out') }
+
+        it { is_expected.to route_to(controller: 'api/v1/users/sessions', action: 'destroy') }
+      end
+
+      describe '#validate_token' do
+        subject { get('/api/v1/users/validate_token') }
+
+        it { is_expected.to route_to(controller: 'api/v1/users/sessions', action: 'validate_token') }
+      end
+    end
+  RUBY
+end
+
+create_file "spec/support/shared_examples/blueprints/blueprint.rb" do
+  <<~RUBY
+    # frozen_string_literal: true
+    RSpec.shared_examples 'a blueprint' do
+      let(:custom_attributes) { {} }
+      let(:stringifiable_keys) { {} }
+      let(:result) do
+        JSON.parse(described_class.render(record), symbolize_names: true)
+      end
+      let(:stringified_values) do
+        stringifiable_keys.index_with do |key|
+          record[key].to_s
+        end
+      end
+      describe '#render' do
+        it 'renders the correct body' do #rubocop:disable RSpec/ExampleLength
+          attributes = if record.respond_to?(:attributes)
+                         record.attributes
+                       elsif record.respond_to?(:to_h)
+                         record.to_h
+                       else
+                         JSON.parse(record.to_json, symbolize_names: true)
+                       end
+          expect(result.keys).to match_array(expected_keys)
+          expect(result).to match(
+            attributes
+              .symbolize_keys
+              .slice(*expected_keys)
+              .merge(
+                custom_attributes,
+                stringified_values
+              )
+          )
+        end
+      end
+    end
+  RUBY
+end
+
+create_file "spec/swagger_helper.rb" do
+  <<~RUBY
+    # frozen_string_literal: true
+
+    require 'rails_helper'
+
+    RSpec.configure do |config|
+      # Specify a root folder where Swagger JSON files are generated
+      # NOTE: If you're using the rswag-api to serve API descriptions, you'll need
+      # to ensure that it's configured to serve Swagger from the same folder
+      config.openapi_root = Rails.root.join('swagger').to_s
+
+      # Define one or more Swagger documents and provide global metadata for each one
+      # When you run the 'rswag:specs:swaggerize' rake task, the complete Swagger will
+      # be generated at the provided relative path under openapi_root
+      # By default, the operations defined in spec files are added to the first
+      # document below. You can override this behavior by adding a openapi_spec tag to the
+      # the root example_group in your specs, e.g. describe '...', openapi_spec: 'v2/swagger.json'
+      config.openapi_specs = {
+        'v1/swagger.yaml' => {
+          openapi: '3.0.1',
+          info: {
+            title: 'API V1',
+            version: 'v1'
+          },
+          paths: {},
+          servers: [
+            {
+              url: 'https://{defaultHost}',
+              variables: {
+                defaultHost: {
+                  default: 'www.example.com'
+                }
+              }
+            }
+          ]
+        }
+      }
+
+      # Specify the format of the output Swagger file when running 'rswag:specs:swaggerize'.
+      # The openapi_specs configuration option has the filename including format in
+      # the key, this may want to be changed to avoid putting yaml in json files.
+      # Defaults to json. Accepts ':json' and ':yaml'.
+      config.openapi_format = :yaml
+    end
+  RUBY
+end
+
 # ── Swagger scaffold ──────────────────────────────────────────
 empty_directory "swagger/v1"
 create_file "swagger/v1/swagger.yaml" do
