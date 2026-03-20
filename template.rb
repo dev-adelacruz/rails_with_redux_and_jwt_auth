@@ -1599,7 +1599,8 @@ end
 #   2. Credential written — no KeyError when initializer loads next
 #   3. JWT config appended — bang method safe, credential is present
 say "== Creating and migrating database ==", :green
-rails_command "db:create db:migrate"
+run "bin/rails db:create"
+run "bin/rails db:migrate"
 
 say "== Writing devise_jwt_secret_key credential ==", :green
 # Rails 8.1: credentials.write requires the content as an argument.
