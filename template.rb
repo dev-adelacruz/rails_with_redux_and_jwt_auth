@@ -142,11 +142,14 @@ create_file "app/views/layouts/application.html.erb" do
         <meta name="viewport" content="width=device-width,initial-scale=1">
         <%= csrf_meta_tags %>
         <%= csp_meta_tag %>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
         <%= vite_client_tag %>
         <%= vite_stylesheet_tag 'tailwind.css' %>
       </head>
 
-      <body class="bg-gradient-to-br from-slate-100 via-blue-50 to-indigo-100 min-h-screen flex items-center justify-center p-4">
+      <body class="h-full">
         <%= yield %>
         <div id="root"></div>
         <%= vite_javascript_tag 'application.tsx' %>
@@ -163,9 +166,46 @@ create_file "app/frontend/assets/styles/tailwind.css" do
   <<~CSS
     @import 'tailwindcss';
 
+    @keyframes gradient-shift {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-18px); }
+    }
+
+    @keyframes float-delayed {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-12px); }
+    }
+
+    @keyframes bar-fill {
+      from { width: 0%; }
+      to { width: var(--bar-width); }
+    }
+
+    @layer utilities {
+      .animate-gradient-shift {
+        background-size: 200% 200%;
+        animation: gradient-shift 10s ease infinite;
+      }
+      .animate-float {
+        animation: float 7s ease-in-out infinite;
+      }
+      .animate-float-delayed {
+        animation: float-delayed 7s ease-in-out 2.5s infinite;
+      }
+      .animate-bar-fill {
+        animation: bar-fill 1s ease-out forwards;
+      }
+    }
+
     @layer base {
       html, body, #root {
         @apply h-full;
+        font-family: 'Open Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       }
     }
   CSS
@@ -705,25 +745,24 @@ create_file "app/frontend/components/ProtectedRoute.tsx" do
       const [authChecked, setAuthChecked] = useState(false);
 
       useEffect(() => {
-        // Mark that auth check has completed when loading finishes
         if (!isLoading) {
           setAuthChecked(true);
         }
       }, [isLoading]);
 
-      // Show loading state while checking authentication
-      if (isLoading) {
-        return <div>Loading...</div>;
+      if (isLoading || !authChecked) {
+        return (
+          <div className="flex items-center justify-center h-screen bg-slate-50">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-10 h-10 border-[3px] border-teal-600 border-t-transparent rounded-full animate-spin" />
+              <p className="text-sm font-medium text-slate-400 tracking-wide">Loading...</p>
+            </div>
+          </div>
+        );
       }
 
-      // Only redirect if auth check has completed and user is not signed in
-      if (authChecked && !isSignedIn) {
+      if (!isSignedIn) {
         return <Navigate to="/login" replace />;
-      }
-
-      // Don't render anything until auth check is complete
-      if (!authChecked) {
-        return <div>Loading...</div>;
       }
 
       return <>{children}</>;
@@ -736,68 +775,68 @@ end
 # LoginForm
 create_file "app/frontend/components/auth/LoginForm.tsx" do
   <<~TSX
-    import React, { useState, useEffect } from 'react';
+    import React, { useState } from 'react';
     import { useDispatch, useSelector } from 'react-redux';
     import { AppDispatch, RootState } from '../../state/store';
     import { loginUser, clearError } from '../../state/user/userSlice';
     import { tokenStorage } from '../../services/tokenStorage';
-    import { Mail, Lock, LogIn, Zap } from 'lucide-react';
+    import { Mail, Lock, ArrowRight, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
     interface LoginFormProps {
       onSuccess: () => void;
-      onError: (error: string) => void;
     }
 
-    const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onError }) => {
+    const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
       const dispatch = useDispatch<AppDispatch>();
       const { isLoading, error } = useSelector((state: RootState) => state.user);
-      
+
       const [email, setEmail] = useState('');
       const [password, setPassword] = useState('');
       const [rememberMe, setRememberMe] = useState(false);
+      const [showPassword, setShowPassword] = useState(false);
+      const [localError, setLocalError] = useState<string | null>(null);
 
-      useEffect(() => {
-        if (error) {
-          onError(error);
-          dispatch(clearError());
-        }
-      }, [error, onError, dispatch]);
+      const displayError = localError || error;
 
       const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        
+        setLocalError(null);
+        dispatch(clearError());
+
         const result = await dispatch(loginUser({ email, password }));
-        
+
         if (loginUser.fulfilled.match(result)) {
-          // Store token based on remember me preference
           await tokenStorage.storeToken(result.payload.token, {
             encrypt: true,
-            storageType: rememberMe ? 'local' : 'session'
+            storageType: rememberMe ? 'local' : 'session',
           });
           onSuccess();
+        } else if (loginUser.rejected.match(result)) {
+          setLocalError((result.payload as string) || 'Invalid email or password.');
         }
       };
 
       return (
-        <div className="w-full bg-white rounded-2xl shadow-2xl overflow-hidden border border-gray-100">
-          {/* Accent bar */}
-          <div className="h-1.5 w-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Sign in to your account</h2>
+            <p className="mt-1.5 text-sm text-slate-500">Enter your credentials to access the dashboard.</p>
+          </div>
 
-          <div className="p-10 space-y-8">
-            {/* Branding */}
-            <div className="text-center space-y-3">
-              <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-600 shadow-lg shadow-blue-200 mb-1">
-                <Zap className="w-7 h-7 text-white" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">Welcome back</h1>
-                <p className="mt-1 text-sm text-gray-500">Sign in to your account to continue</p>
-              </div>
+          {displayError && (
+            <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700">
+              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+              <p className="text-sm font-medium">{displayError}</p>
             </div>
+          )}
 
-            <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <label htmlFor="email" className="block text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                Email address
+              </label>
               <div className="relative">
-                <Mail className="absolute w-4.5 h-4.5 text-gray-400 top-3.5 left-3.5" />
+                <Mail className="absolute w-4 h-4 text-slate-400 top-1/2 -translate-y-1/2 left-3.5 pointer-events-none" />
                 <input
                   type="email"
                   id="email"
@@ -805,63 +844,76 @@ create_file "app/frontend/components/auth/LoginForm.tsx" do
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   disabled={isLoading}
-                  placeholder="Email address"
-                  className="w-full pl-10 pr-4 py-3 text-gray-800 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white focus:border-transparent transition-all duration-150 disabled:opacity-50"
+                  placeholder="you@company.com"
+                  className="w-full pl-10 pr-4 py-2.5 text-sm text-slate-800 bg-slate-50 border border-slate-200 rounded-xl placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white focus:border-transparent transition-all duration-150 disabled:opacity-50"
                 />
               </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label htmlFor="password" className="block text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                Password
+              </label>
               <div className="relative">
-                <Lock className="absolute w-4.5 h-4.5 text-gray-400 top-3.5 left-3.5" />
+                <Lock className="absolute w-4 h-4 text-slate-400 top-1/2 -translate-y-1/2 left-3.5 pointer-events-none" />
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   id="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   disabled={isLoading}
-                  placeholder="Password"
-                  className="w-full pl-10 pr-4 py-3 text-gray-800 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white focus:border-transparent transition-all duration-150 disabled:opacity-50"
+                  placeholder="••••••••"
+                  className="w-full pl-10 pr-10 py-2.5 text-sm text-slate-800 bg-slate-50 border border-slate-200 rounded-xl placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white focus:border-transparent transition-all duration-150 disabled:opacity-50"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="rememberMe"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                    disabled={isLoading}
-                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-                  />
-                  <label htmlFor="rememberMe" className="ml-2 text-sm text-gray-600">
-                    Remember me
-                  </label>
-                </div>
-                <a href="#" className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors duration-150">
-                  Forgot password?
-                </a>
-              </div>
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="flex items-center justify-center w-full px-4 py-3 font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-colors duration-150 shadow-md shadow-blue-200"
-              >
-                {isLoading ? (
-                  <span className="flex items-center gap-2">
-                    <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                    </svg>
-                    Signing in…
-                  </span>
-                ) : (
-                  <>
-                    <LogIn className="w-4 h-4 mr-2" />
-                    Sign in
-                  </>
-                )}
+            </div>
+
+            <div className="flex items-center justify-between pt-1">
+              <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  disabled={isLoading}
+                  className="w-4 h-4 text-teal-600 bg-slate-100 border-slate-300 rounded focus:ring-teal-500 focus:ring-offset-0 cursor-pointer"
+                />
+                <span className="text-sm text-slate-600">Remember me</span>
+              </label>
+              <button type="button" className="text-sm font-semibold text-teal-600 hover:text-teal-700 transition-colors duration-150">
+                Forgot password?
               </button>
-            </form>
-          </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="group relative flex items-center justify-center w-full px-4 py-2.5 mt-2 text-sm font-semibold text-white bg-teal-600 rounded-xl hover:bg-teal-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-150 shadow-lg shadow-teal-600/30"
+            >
+              {isLoading ? (
+                <span className="flex items-center gap-2">
+                  <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                  </svg>
+                  Signing in...
+                </span>
+              ) : (
+                <span className="flex items-center gap-2">
+                  Sign in
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform duration-150" />
+                </span>
+              )}
+            </button>
+          </form>
         </div>
       );
     };
@@ -876,28 +928,120 @@ create_file "app/frontend/pages/login/index.tsx" do
     import React from 'react';
     import { useNavigate } from 'react-router-dom';
     import LoginForm from '../../components/auth/LoginForm';
+    import { Zap, BarChart2, ShieldCheck, Users, Globe } from 'lucide-react';
+
+    const features = [
+      { icon: BarChart2, label: 'Real-time analytics & reporting' },
+      { icon: ShieldCheck, label: 'Enterprise-grade JWT security' },
+      { icon: Users, label: 'Role-based access control' },
+      { icon: Globe, label: 'Global infrastructure & 99.9% uptime' },
+    ];
 
     const LoginPage: React.FC = () => {
       const navigate = useNavigate();
 
       const handleLoginSuccess = () => {
-        // Redirect to home or dashboard after successful login
         navigate('/');
       };
 
-      const handleLoginError = (error: string) => {
-        // TODO: Display error message to user
-        console.error('Login error:', error);
-        alert(`Login failed: ${error}`);
-      };
-
       return (
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="w-full max-w-md px-4">
-            <LoginForm
-              onSuccess={handleLoginSuccess}
-              onError={handleLoginError}
+        <div className="flex h-screen overflow-hidden">
+          {/* Left brand panel */}
+          <div className="hidden lg:flex lg:w-[58%] relative flex-col justify-between p-12 overflow-hidden bg-gradient-to-br from-slate-950 via-teal-950 to-slate-950">
+            {/* Animated orbs */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+              <div className="absolute -top-32 -left-32 w-[420px] h-[420px] rounded-full bg-teal-500/20 blur-3xl animate-float" />
+              <div className="absolute -bottom-32 -right-32 w-[380px] h-[380px] rounded-full bg-cyan-500/15 blur-3xl animate-float-delayed" />
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[280px] h-[280px] rounded-full bg-teal-400/10 blur-3xl" />
+            </div>
+
+            {/* Dot grid overlay */}
+            <div
+              className="absolute inset-0 pointer-events-none opacity-[0.07]"
+              style={{ backgroundImage: 'radial-gradient(circle, #fff 1px, transparent 1px)', backgroundSize: '28px 28px' }}
             />
+
+            {/* Top: logo */}
+            <div className="relative z-10 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-teal-600 flex items-center justify-center shadow-lg shadow-teal-900/60">
+                <Zap className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-white text-lg font-bold tracking-tight">AppName</span>
+            </div>
+
+            {/* Middle: hero copy */}
+            <div className="relative z-10 space-y-8">
+              <div className="space-y-4">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/20 border border-teal-500/30">
+                  <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
+                  <span className="text-teal-300 text-xs font-semibold tracking-widest uppercase">Now with AI insights</span>
+                </div>
+                <h1 className="text-[2.6rem] font-extrabold text-white leading-[1.15] tracking-tight">
+                  Everything you need,<br />
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 via-cyan-300 to-emerald-400">
+                    in one platform.
+                  </span>
+                </h1>
+                <p className="text-slate-400 text-base leading-relaxed max-w-sm">
+                  Manage your team, track performance, and grow your business with powerful enterprise tools.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                {features.map(({ icon: Icon, label }) => (
+                  <div key={label} className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-slate-800/60 border border-slate-700/50 flex items-center justify-center shrink-0">
+                      <Icon className="w-4 h-4 text-teal-400" />
+                    </div>
+                    <span className="text-slate-300 text-sm">{label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Bottom: social proof */}
+            <div className="relative z-10 flex items-center gap-4">
+              <div className="flex -space-x-2">
+                {['#0D9488', '#8B5CF6', '#06B6D4', '#F59E0B'].map((color, i) => (
+                  <div
+                    key={i}
+                    className="w-7 h-7 rounded-full border-2 border-slate-900 flex items-center justify-center text-[10px] font-bold text-white"
+                    style={{ backgroundColor: color }}
+                  >
+                    {['JD', 'AM', 'CK', 'TR'][i]}
+                  </div>
+                ))}
+              </div>
+              <p className="text-slate-400 text-xs">
+                Trusted by <span className="text-slate-200 font-semibold">10,000+</span> teams worldwide
+              </p>
+            </div>
+          </div>
+
+          {/* Right form panel */}
+          <div className="flex-1 flex flex-col items-center justify-center bg-white px-8 py-12 overflow-y-auto">
+            {/* Mobile-only logo */}
+            <div className="lg:hidden flex items-center gap-2.5 mb-10">
+              <div className="w-8 h-8 rounded-xl bg-teal-600 flex items-center justify-center">
+                <Zap className="w-4 h-4 text-white" />
+              </div>
+              <span className="text-slate-900 text-base font-bold tracking-tight">AppName</span>
+            </div>
+
+            <div className="w-full max-w-sm">
+              <LoginForm onSuccess={handleLoginSuccess} />
+
+              <p className="mt-8 text-center text-sm text-slate-400">
+                Don't have an account?{' '}
+                <button className="font-semibold text-teal-600 hover:text-teal-700 transition-colors duration-150">
+                  Contact your administrator
+                </button>
+              </p>
+            </div>
+
+            <p className="mt-12 text-xs text-slate-300">
+              © {new Date().getFullYear()} AppName. All rights reserved.
+            </p>
           </div>
         </div>
       );
@@ -917,7 +1061,8 @@ create_file "app/frontend/pages/home/index.tsx" do
     import {
       LayoutDashboard, User, Settings, LogOut, Bell,
       ChevronDown, Zap, TrendingUp, Users, ShoppingCart,
-      DollarSign, ArrowUpRight, ArrowDownRight,
+      DollarSign, ArrowUpRight, ArrowDownRight, Menu, X,
+      ArrowRight, UserPlus, BarChart2, ShieldCheck, Key,
     } from 'lucide-react';
 
     const statCards = [
@@ -927,9 +1072,10 @@ create_file "app/frontend/pages/home/index.tsx" do
         change: '+12.5%',
         up: true,
         icon: DollarSign,
-        iconBg: 'bg-blue-100',
-        iconColor: 'text-blue-600',
-        accent: 'from-blue-500 to-blue-600',
+        gradient: 'from-teal-500 to-cyan-400',
+        shadow: 'shadow-teal-500/20',
+        iconBg: 'bg-teal-500/10',
+        iconColor: 'text-teal-500',
       },
       {
         label: 'Active Users',
@@ -937,9 +1083,10 @@ create_file "app/frontend/pages/home/index.tsx" do
         change: '+8.1%',
         up: true,
         icon: Users,
-        iconBg: 'bg-indigo-100',
-        iconColor: 'text-indigo-600',
-        accent: 'from-indigo-500 to-indigo-600',
+        gradient: 'from-violet-500 to-purple-600',
+        shadow: 'shadow-violet-500/20',
+        iconBg: 'bg-violet-500/10',
+        iconColor: 'text-violet-500',
       },
       {
         label: 'New Orders',
@@ -947,9 +1094,10 @@ create_file "app/frontend/pages/home/index.tsx" do
         change: '-3.2%',
         up: false,
         icon: ShoppingCart,
-        iconBg: 'bg-purple-100',
-        iconColor: 'text-purple-600',
-        accent: 'from-purple-500 to-purple-600',
+        gradient: 'from-amber-500 to-orange-500',
+        shadow: 'shadow-amber-500/20',
+        iconBg: 'bg-amber-500/10',
+        iconColor: 'text-amber-500',
       },
       {
         label: 'Growth Rate',
@@ -957,138 +1105,175 @@ create_file "app/frontend/pages/home/index.tsx" do
         change: '+4.9%',
         up: true,
         icon: TrendingUp,
-        iconBg: 'bg-emerald-100',
-        iconColor: 'text-emerald-600',
-        accent: 'from-emerald-500 to-emerald-600',
+        gradient: 'from-sky-500 to-blue-500',
+        shadow: 'shadow-sky-500/20',
+        iconBg: 'bg-sky-500/10',
+        iconColor: 'text-sky-500',
       },
+    ];
+
+    const activities = [
+      { title: 'New user registered', desc: 'sarah.chen@company.com joined the platform', time: '2m ago', icon: UserPlus, iconBg: 'bg-teal-50', iconColor: 'text-teal-600', dot: 'bg-teal-500' },
+      { title: 'Order #1042 completed', desc: '$299 — Pro plan annual subscription', time: '47m ago', icon: ShoppingCart, iconBg: 'bg-emerald-50', iconColor: 'text-emerald-600', dot: 'bg-emerald-500' },
+      { title: 'Monthly report ready', desc: 'March 2026 analytics report generated', time: '2h ago', icon: BarChart2, iconBg: 'bg-violet-50', iconColor: 'text-violet-600', dot: 'bg-violet-500' },
+      { title: 'System backup succeeded', desc: 'All 12 databases backed up successfully', time: '3h ago', icon: ShieldCheck, iconBg: 'bg-amber-50', iconColor: 'text-amber-600', dot: 'bg-amber-500' },
+      { title: 'New API key created', desc: 'Production environment — expires in 90 days', time: '5h ago', icon: Key, iconBg: 'bg-slate-100', iconColor: 'text-slate-600', dot: 'bg-slate-400' },
+    ];
+
+    const performanceMetrics = [
+      { label: 'Conversion Rate', pct: 68, gradient: 'from-teal-500 to-cyan-400' },
+      { label: 'User Retention', pct: 84, gradient: 'from-violet-500 to-purple-600' },
+      { label: 'Goal Completion', pct: 52, gradient: 'from-amber-500 to-orange-500' },
+      { label: 'Revenue Target', pct: 79, gradient: 'from-sky-500 to-blue-500' },
     ];
 
     const navItems = [
       { label: 'Dashboard', icon: LayoutDashboard, active: true },
+      { label: 'Users', icon: Users, active: false },
       { label: 'Profile', icon: User, active: false },
       { label: 'Settings', icon: Settings, active: false },
     ];
+
+    const StatCard: React.FC<typeof statCards[0]> = ({ label, value, change, up, icon: Icon, gradient, shadow, iconBg, iconColor }) => (
+      <div className={`bg-white rounded-2xl p-5 border border-slate-100 shadow-md ${shadow} hover:-translate-y-1 hover:shadow-lg transition-all duration-200 cursor-default`}>
+        <div className="flex items-start justify-between">
+          <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center`}>
+            <Icon className={`w-5 h-5 ${iconColor}`} />
+          </div>
+          <span className={`inline-flex items-center gap-0.5 text-xs font-semibold px-2 py-1 rounded-full ${up ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'}`}>
+            {up ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+            {change}
+          </span>
+        </div>
+        <div className="mt-4">
+          <p className="text-2xl font-bold text-slate-900 tracking-tight">{value}</p>
+          <p className="text-xs font-medium text-slate-500 mt-1 uppercase tracking-wider">{label}</p>
+        </div>
+        <div className={`mt-4 h-1 w-full rounded-full bg-gradient-to-r ${gradient} opacity-80`} />
+      </div>
+    );
 
     const HomePage: React.FC = () => {
       const dispatch = useDispatch();
       const user = useSelector((state: RootState) => state.user.user);
       const [dropdownOpen, setDropdownOpen] = useState(false);
+      const [sidebarOpen, setSidebarOpen] = useState(false);
       const dropdownRef = useRef<HTMLDivElement>(null);
 
-      const handleLogout = () => {
-        dispatch(logoutUser() as any);
-      };
+      const handleLogout = () => { dispatch(logoutUser() as any); };
 
-      const initials = user?.email
-        ? user.email.slice(0, 2).toUpperCase()
-        : 'U';
-
-      const today = new Date().toLocaleDateString('en-US', {
-        weekday: 'long', month: 'long', day: 'numeric',
-      });
+      const initials = user?.email ? user.email.slice(0, 2).toUpperCase() : 'U';
+      const firstName = user?.email?.split('@')[0] ?? 'there';
+      const hour = new Date().getHours();
+      const timeOfDay = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
+      const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
       useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
-          if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-            setDropdownOpen(false);
-          }
+          if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) setDropdownOpen(false);
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
       }, []);
 
       return (
-        <div className="flex h-screen bg-gray-50">
+        <div className="flex h-screen bg-slate-50 overflow-hidden">
+          {sidebarOpen && (
+            <div className="fixed inset-0 bg-black/50 z-20 lg:hidden backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
+          )}
+
           {/* Sidebar */}
-          <aside className="w-64 bg-gray-900 text-white flex flex-col shadow-xl">
-            {/* Logo */}
-            <div className="h-16 flex items-center gap-3 px-5 border-b border-gray-700/60">
-              <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-600 shadow-lg shadow-blue-900/50">
-                <Zap className="w-4 h-4 text-white" />
+          <aside className={`fixed lg:static inset-y-0 left-0 z-30 w-64 bg-slate-900 flex flex-col shrink-0 transform transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+            <div className="h-14 flex items-center justify-between px-5 border-b border-slate-700/50 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-teal-600 flex items-center justify-center shadow-lg shadow-teal-900/60">
+                  <Zap className="w-4 h-4 text-white" />
+                </div>
+                <span className="text-white font-bold text-base tracking-tight">AppName</span>
               </div>
-              <span className="text-lg font-bold tracking-tight">AppName</span>
+              <button onClick={() => setSidebarOpen(false)} className="lg:hidden p-1 text-slate-500 hover:text-slate-300 transition-colors">
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
-            {/* Nav */}
-            <nav className="flex-1 px-3 py-5 space-y-1">
+            <div className="px-5 pt-5 pb-2">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.12em]">Main Menu</p>
+            </div>
+
+            <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto">
               {navItems.map(({ label, icon: Icon, active }) => (
-                <a
+                <button
                   key={label}
-                  href="#"
-                  className={`flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150 ${
-                    active
-                      ? 'bg-blue-600 text-white shadow-md shadow-blue-900/40'
-                      : 'text-gray-400 hover:bg-gray-800 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150 text-left ${active ? 'bg-teal-600/15 text-teal-400 border-l-2 border-teal-500 pl-[10px]' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100 border-l-2 border-transparent pl-[10px]'}`}
                 >
-                  <Icon className="w-4.5 h-4.5 mr-3 shrink-0" />
+                  <Icon className="w-4 h-4 shrink-0" />
                   {label}
-                </a>
+                  {active && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-teal-400" />}
+                </button>
               ))}
             </nav>
 
+            <div className="p-3 border-t border-slate-700/50 shrink-0">
+              <div className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-slate-800 transition-colors group">
+                <div className="w-8 h-8 rounded-lg bg-teal-600 flex items-center justify-center text-xs font-bold text-white shrink-0">{initials}</div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-slate-300 truncate">{user?.email}</p>
+                  <p className="text-[10px] text-slate-500 font-medium">Administrator</p>
+                </div>
+                <button onClick={handleLogout} title="Sign out" className="p-1 text-slate-500 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100">
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
           </aside>
 
-          {/* Main content */}
-          <div className="flex-1 flex flex-col overflow-hidden">
-            {/* Header */}
-            <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 shadow-sm shrink-0">
-              <div>
-                <h1 className="text-lg font-semibold text-gray-900 leading-tight">Dashboard Overview</h1>
-                <p className="text-xs text-gray-400">{today}</p>
+          {/* Main */}
+          <div className="flex-1 flex flex-col min-w-0">
+            <header className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-4 lg:px-6 shrink-0 shadow-sm">
+              <div className="flex items-center gap-3">
+                <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors">
+                  <Menu className="w-5 h-5" />
+                </button>
+                <div>
+                  <h1 className="text-sm font-bold text-slate-900 leading-tight">Dashboard</h1>
+                  <p className="text-[11px] text-slate-400 hidden sm:block">{today}</p>
+                </div>
               </div>
-              <div className="flex items-center gap-4">
-                {/* Notification bell */}
-                <button className="relative p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors duration-150">
-                  <Bell className="w-5 h-5" />
-                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white" />
+
+              <div className="flex items-center gap-2">
+                <button className="relative p-2 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors duration-150">
+                  <Bell className="w-4.5 h-4.5" />
+                  <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-red-500 rounded-full ring-2 ring-white" />
                 </button>
 
-                {/* User pill + dropdown */}
                 <div className="relative" ref={dropdownRef}>
                   <button
                     onClick={() => setDropdownOpen((prev) => !prev)}
-                    className="flex items-center gap-2.5 pl-1 pr-3 py-1.5 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors duration-150"
+                    aria-expanded={dropdownOpen}
+                    className="flex items-center gap-2 pl-1 pr-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors duration-150"
                   >
-                    <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-blue-600 text-xs font-bold text-white shrink-0">
-                      {initials}
-                    </div>
-                    <div className="flex flex-col items-start min-w-0">
-                      <span className="text-sm font-medium text-gray-700 max-w-[140px] truncate leading-tight">{user?.email}</span>
-                      <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 px-1.5 py-px rounded-full leading-tight tracking-wide">Administrator</span>
-                    </div>
-                    <ChevronDown className={`w-4 h-4 text-gray-400 shrink-0 transition-transform duration-150 ${dropdownOpen ? 'rotate-180' : ''}`} />
+                    <div className="w-7 h-7 rounded-lg bg-teal-600 flex items-center justify-center text-[11px] font-bold text-white shrink-0">{initials}</div>
+                    <span className="text-sm font-medium text-slate-700 max-w-[140px] truncate hidden sm:block">{user?.email}</span>
+                    <ChevronDown className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform duration-150 ${dropdownOpen ? 'rotate-180' : ''}`} />
                   </button>
 
-                  {/* Dropdown panel */}
                   {dropdownOpen && (
-                    <div className="absolute right-0 mt-2 w-52 bg-white rounded-xl border border-gray-200 shadow-lg shadow-gray-200/60 overflow-hidden z-50">
-                      {/* Account info header */}
-                      <div className="px-4 py-3 border-b border-gray-100">
-                        <p className="text-xs text-gray-400">Signed in as</p>
-                        <p className="text-sm font-medium text-gray-800 truncate">{user?.email}</p>
+                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl border border-slate-200 shadow-xl shadow-slate-200/80 overflow-hidden z-50">
+                      <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
+                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Signed in as</p>
+                        <p className="text-sm font-semibold text-slate-800 truncate mt-0.5">{user?.email}</p>
                       </div>
-
-                      {/* Menu items */}
                       <div className="py-1">
-                        <button className="flex items-center w-full gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors duration-150">
-                          <User className="w-4 h-4 text-gray-400 shrink-0" />
-                          Profile
+                        <button className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                          <User className="w-4 h-4 text-slate-400 shrink-0" />Profile
                         </button>
-                        <button className="flex items-center w-full gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors duration-150">
-                          <Settings className="w-4 h-4 text-gray-400 shrink-0" />
-                          Settings
+                        <button className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                          <Settings className="w-4 h-4 text-slate-400 shrink-0" />Settings
                         </button>
                       </div>
-
-                      {/* Divider + Sign out */}
-                      <div className="border-t border-gray-100 py-1">
-                        <button
-                          onClick={handleLogout}
-                          className="flex items-center w-full gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors duration-150"
-                        >
-                          <LogOut className="w-4 h-4 shrink-0" />
-                          Sign out
+                      <div className="border-t border-slate-100 py-1">
+                        <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                          <LogOut className="w-4 h-4 shrink-0" />Sign out
                         </button>
                       </div>
                     </div>
@@ -1097,61 +1282,78 @@ create_file "app/frontend/pages/home/index.tsx" do
               </div>
             </header>
 
-            {/* Content area */}
-            <main className="flex-1 overflow-y-auto p-6 space-y-6">
+            <main className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-5">
               {/* Welcome banner */}
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">Good morning 👋</h2>
-                <p className="text-sm text-gray-500 mt-0.5">Here's what's happening with your projects today.</p>
+              <div className="relative rounded-2xl overflow-hidden bg-gradient-to-r from-slate-950 via-teal-950 to-slate-950 animate-gradient-shift">
+                <div className="absolute inset-0 pointer-events-none">
+                  <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full bg-teal-500/25 blur-3xl" />
+                  <div className="absolute -bottom-16 left-1/4 w-48 h-48 rounded-full bg-cyan-500/20 blur-3xl" />
+                  <div className="absolute inset-0 opacity-[0.04]" style={{ backgroundImage: 'radial-gradient(circle, #fff 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+                </div>
+                <div className="relative z-10 px-6 py-6 lg:px-8 lg:py-7">
+                  <p className="text-teal-400 text-xs font-semibold uppercase tracking-widest mb-1">Overview</p>
+                  <h2 className="text-xl lg:text-2xl font-bold text-white tracking-tight">
+                    Good {timeOfDay}, <span className="text-teal-300">{firstName}</span> 👋
+                  </h2>
+                  <p className="text-slate-400 text-sm mt-1.5 max-w-md">Your platform is running smoothly. Here's a summary of today's activity.</p>
+                  <button className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-sm font-semibold transition-all duration-150 shadow-lg shadow-teal-900/40 group">
+                    View full report
+                    <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform duration-150" />
+                  </button>
+                </div>
               </div>
 
               {/* Stat cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-                {statCards.map(({ label, value, change, up, icon: Icon, iconBg, iconColor, accent }) => (
-                  <div
-                    key={label}
-                    className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-200"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className={`p-2.5 rounded-xl ${iconBg}`}>
-                        <Icon className={`w-5 h-5 ${iconColor}`} />
-                      </div>
-                      <span
-                        className={`inline-flex items-center gap-0.5 text-xs font-semibold px-2 py-0.5 rounded-full ${
-                          up
-                            ? 'bg-emerald-50 text-emerald-600'
-                            : 'bg-red-50 text-red-500'
-                        }`}
-                      >
-                        {up ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                        {change}
-                      </span>
-                    </div>
-                    <div className="mt-4">
-                      <p className="text-2xl font-bold text-gray-900">{value}</p>
-                      <p className="text-sm text-gray-500 mt-0.5">{label}</p>
-                    </div>
-                    <div className={`mt-4 h-1 w-full rounded-full bg-gradient-to-r ${accent} opacity-70`} />
-                  </div>
-                ))}
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                {statCards.map((card) => <StatCard key={card.label} {...card} />)}
               </div>
 
-              {/* Placeholder content block */}
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-base font-semibold text-gray-900">Recent Activity</h3>
-                  <button className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors duration-150">
-                    View all
-                  </button>
+              {/* Bottom row */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                  <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                    <h3 className="text-sm font-bold text-slate-900">Recent Activity</h3>
+                    <button className="flex items-center gap-1 text-xs font-semibold text-teal-600 hover:text-teal-700 transition-colors group">
+                      View all<ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+                    </button>
+                  </div>
+                  <div className="divide-y divide-slate-50">
+                    {activities.map((a, i) => (
+                      <div key={i} className="flex items-center gap-4 px-6 py-3.5 hover:bg-slate-50/70 transition-colors">
+                        <div className={`w-9 h-9 rounded-xl ${a.iconBg} flex items-center justify-center shrink-0`}>
+                          <a.icon className={`w-4 h-4 ${a.iconColor}`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-slate-800 truncate">{a.title}</p>
+                          <p className="text-xs text-slate-400 truncate">{a.desc}</p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className={`w-1.5 h-1.5 rounded-full ${a.dot}`} />
+                          <span className="text-xs text-slate-400">{a.time}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="space-y-3">
-                  {['New user registered', 'Order #1042 completed', 'Monthly report generated', 'System backup succeeded'].map((item, i) => (
-                    <div key={i} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
-                      <div className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
-                      <p className="text-sm text-gray-600">{item}</p>
-                      <span className="ml-auto text-xs text-gray-400">{i + 1}h ago</span>
-                    </div>
-                  ))}
+
+                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                  <div className="px-6 py-4 border-b border-slate-100">
+                    <h3 className="text-sm font-bold text-slate-900">Performance</h3>
+                    <p className="text-xs text-slate-400 mt-0.5">vs. previous month</p>
+                  </div>
+                  <div className="p-6 space-y-5">
+                    {performanceMetrics.map((m) => (
+                      <div key={m.label}>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-semibold text-slate-600">{m.label}</span>
+                          <span className="text-xs font-bold text-slate-800">{m.pct}%</span>
+                        </div>
+                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full bg-gradient-to-r ${m.gradient}`} style={{ width: `${m.pct}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </main>
