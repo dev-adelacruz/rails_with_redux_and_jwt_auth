@@ -13,25 +13,24 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
-    // Mark that auth check has completed when loading finishes
     if (!isLoading) {
       setAuthChecked(true);
     }
   }, [isLoading]);
 
-  // Show loading state while checking authentication
-  if (isLoading) {
-    return <div>Loading...</div>;
+  if (isLoading || !authChecked) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-slate-50">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-[3px] border-teal-600 border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm font-medium text-slate-400 tracking-wide">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
-  // Only redirect if auth check has completed and user is not signed in
-  if (authChecked && !isSignedIn) {
+  if (!isSignedIn) {
     return <Navigate to="/login" replace />;
-  }
-
-  // Don't render anything until auth check is complete
-  if (!authChecked) {
-    return <div>Loading...</div>;
   }
 
   return <>{children}</>;
