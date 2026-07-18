@@ -1,0 +1,25 @@
+name: Verify template
+
+# Fails the build if template.rb has a syntax error or has drifted from the
+# live reference app. Keeps `rails new -m template.rb` output in sync with
+# what this repo actually ships.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2.2"
+
+      - name: Ruby syntax check of template.rb
+        run: ruby -c template.rb
+
+      - name: Verify template.rb matches the reference app
+        run: ruby bin/verify_template

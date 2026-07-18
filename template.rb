@@ -10,6 +10,27 @@ def source_paths
   [__dir__]
 end
 
+# Run a command; halt with a clear message if it fails, instead of
+# silently continuing and producing a broken app.
+def run!(command, hint: nil)
+  run(command)
+  return if $?.nil? || $?.success?
+
+  say "", :red
+  say "✗ Step failed: #{command}", :red
+  say "  #{hint}", :yellow if hint
+  say "  Fix the issue above, then re-run the generator.", :yellow
+  exit 1
+end
+
+# ── Preflight ────────────────────────────────────────────────
+# This template targets Rails >= 7.1 (Devise/JWT wiring, credentials API).
+if Gem::Version.new(Rails::VERSION::STRING) < Gem::Version.new("7.1")
+  say "This template requires Rails >= 7.1 (you have #{Rails::VERSION::STRING}).", :red
+  say "Install a supported Rails and re-run: gem install rails -v '~> 7.1'", :yellow
+  exit 1
+end
+
 # ── Gems ─────────────────────────────────────────────────────
 say "== Adding gems ==", :green
 
@@ -42,16 +63,16 @@ end
 
 # ── Bundle install ────────────────────────────────────────────
 say "== Installing gems ==", :green
-run "bundle install"
+run! "bundle install", hint: "Check your Gemfile and network, then run 'bundle install'."
 
 # ── Vite Rails setup ─────────────────────────────────────────
 say "== Setting up Vite Rails ==", :green
-run "bundle exec vite install"
+run! "bundle exec vite install", hint: "Ensure Node.js 18+ and Yarn are installed."
 
 # ── JS dependencies ───────────────────────────────────────────
 say "== Adding JS dependencies ==", :green
-run "yarn add react react-dom react-router-dom react-redux @reduxjs/toolkit lucide-react tailwindcss @tailwindcss/vite"
-run "yarn add --dev @vitejs/plugin-react @types/react @types/react-dom @types/styled-components typescript vite vite-plugin-ruby vite-tsconfig-paths"
+run! "yarn add react@^18.1.0 react-dom@^18.0.5 react-router-dom@^7.6.2 react-redux@^9.2.0 @reduxjs/toolkit@^2.5.0 lucide-react@^0.544.0 tailwindcss@^4.1.13 @tailwindcss/vite@^4.1.13", hint: "Ensure Node.js 18+ and Yarn are installed."
+run! "yarn add --dev @vitejs/plugin-react@^4.3.4 @types/react@^18.1.0 @types/react-dom@^18.0.5 @types/styled-components@^5.1.30 typescript@^5.7.2 vite@^5.4.11 vite-plugin-ruby@^5.1.1 vite-tsconfig-paths@^5.1.4", hint: "Ensure Node.js 18+ and Yarn are installed."
 
 # ── vite.config.ts ───────────────────────────────────────────
 say "== Writing vite.config.ts ==", :green
@@ -508,8 +529,19 @@ create_file "app/frontend/services/authService.ts" do
             throw new Error(errorData.message || `Login failed with status ${response.status}`);
           }
 
-          const data: AuthResponse = await response.json();
-          return data;
+          // devise-jwt returns the JWT in the Authorization response header
+          // (as "Bearer <token>"), not in the JSON body.
+          const authHeader = response.headers.get('Authorization');
+          const token = authHeader ? authHeader.replace(/^Bearer\s+/i, '') : '';
+
+          if (!token) {
+            throw new Error('Login succeeded but no auth token was returned');
+          }
+
+          const body = await response.json().catch(() => ({}));
+          const user = body?.status?.data?.user;
+
+          return { token, user };
         } catch (error) {
           if (error instanceof Error) {
             throw new Error(error.message);
@@ -946,8 +978,9 @@ create_file "app/frontend/pages/login/index.tsx" do
 
       return (
         <div className="flex h-screen overflow-hidden">
-          {/* Left brand panel */}
+          {/* ── Left brand panel ── */}
           <div className="hidden lg:flex lg:w-[58%] relative flex-col justify-between p-12 overflow-hidden bg-gradient-to-br from-slate-950 via-teal-950 to-slate-950">
+
             {/* Animated orbs */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
               <div className="absolute -top-32 -left-32 w-[420px] h-[420px] rounded-full bg-teal-500/20 blur-3xl animate-float" />
@@ -958,7 +991,10 @@ create_file "app/frontend/pages/login/index.tsx" do
             {/* Dot grid overlay */}
             <div
               className="absolute inset-0 pointer-events-none opacity-[0.07]"
-              style={{ backgroundImage: 'radial-gradient(circle, #fff 1px, transparent 1px)', backgroundSize: '28px 28px' }}
+              style={{
+                backgroundImage: 'radial-gradient(circle, #fff 1px, transparent 1px)',
+                backgroundSize: '28px 28px',
+              }}
             />
 
             {/* Top: logo */}
@@ -1018,8 +1054,9 @@ create_file "app/frontend/pages/login/index.tsx" do
             </div>
           </div>
 
-          {/* Right form panel */}
+          {/* ── Right form panel ── */}
           <div className="flex-1 flex flex-col items-center justify-center bg-white px-8 py-12 overflow-y-auto">
+
             {/* Mobile-only logo */}
             <div className="lg:hidden flex items-center gap-2.5 mb-10">
               <div className="w-8 h-8 rounded-xl bg-teal-600 flex items-center justify-center">
@@ -1064,6 +1101,8 @@ create_file "app/frontend/pages/home/index.tsx" do
       DollarSign, ArrowUpRight, ArrowDownRight, Menu, X,
       ArrowRight, UserPlus, BarChart2, ShieldCheck, Key,
     } from 'lucide-react';
+
+    // ─── Data ───────────────────────────────────────────────────────────────────
 
     const statCards = [
       {
@@ -1113,11 +1152,51 @@ create_file "app/frontend/pages/home/index.tsx" do
     ];
 
     const activities = [
-      { title: 'New user registered', desc: 'sarah.chen@company.com joined the platform', time: '2m ago', icon: UserPlus, iconBg: 'bg-teal-50', iconColor: 'text-teal-600', dot: 'bg-teal-500' },
-      { title: 'Order #1042 completed', desc: '$299 — Pro plan annual subscription', time: '47m ago', icon: ShoppingCart, iconBg: 'bg-emerald-50', iconColor: 'text-emerald-600', dot: 'bg-emerald-500' },
-      { title: 'Monthly report ready', desc: 'March 2026 analytics report generated', time: '2h ago', icon: BarChart2, iconBg: 'bg-violet-50', iconColor: 'text-violet-600', dot: 'bg-violet-500' },
-      { title: 'System backup succeeded', desc: 'All 12 databases backed up successfully', time: '3h ago', icon: ShieldCheck, iconBg: 'bg-amber-50', iconColor: 'text-amber-600', dot: 'bg-amber-500' },
-      { title: 'New API key created', desc: 'Production environment — expires in 90 days', time: '5h ago', icon: Key, iconBg: 'bg-slate-100', iconColor: 'text-slate-600', dot: 'bg-slate-400' },
+      {
+        title: 'New user registered',
+        desc: 'sarah.chen@company.com joined the platform',
+        time: '2m ago',
+        icon: UserPlus,
+        iconBg: 'bg-teal-50',
+        iconColor: 'text-teal-600',
+        dot: 'bg-teal-500',
+      },
+      {
+        title: 'Order #1042 completed',
+        desc: '$299 — Pro plan annual subscription',
+        time: '47m ago',
+        icon: ShoppingCart,
+        iconBg: 'bg-emerald-50',
+        iconColor: 'text-emerald-600',
+        dot: 'bg-emerald-500',
+      },
+      {
+        title: 'Monthly report ready',
+        desc: 'March 2026 analytics report generated',
+        time: '2h ago',
+        icon: BarChart2,
+        iconBg: 'bg-violet-50',
+        iconColor: 'text-violet-600',
+        dot: 'bg-violet-500',
+      },
+      {
+        title: 'System backup succeeded',
+        desc: 'All 12 databases backed up successfully',
+        time: '3h ago',
+        icon: ShieldCheck,
+        iconBg: 'bg-amber-50',
+        iconColor: 'text-amber-600',
+        dot: 'bg-amber-500',
+      },
+      {
+        title: 'New API key created',
+        desc: 'Production environment — expires in 90 days',
+        time: '5h ago',
+        icon: Key,
+        iconBg: 'bg-slate-100',
+        iconColor: 'text-slate-600',
+        dot: 'bg-slate-400',
+      },
     ];
 
     const performanceMetrics = [
@@ -1134,13 +1213,19 @@ create_file "app/frontend/pages/home/index.tsx" do
       { label: 'Settings', icon: Settings, active: false },
     ];
 
-    const StatCard: React.FC<typeof statCards[0]> = ({ label, value, change, up, icon: Icon, gradient, shadow, iconBg, iconColor }) => (
+    // ─── Sub-components ──────────────────────────────────────────────────────────
+
+    const StatCard: React.FC<typeof statCards[0]> = ({
+      label, value, change, up, icon: Icon, gradient, shadow, iconBg, iconColor,
+    }) => (
       <div className={`bg-white rounded-2xl p-5 border border-slate-100 shadow-md ${shadow} hover:-translate-y-1 hover:shadow-lg transition-all duration-200 cursor-default`}>
         <div className="flex items-start justify-between">
           <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center`}>
             <Icon className={`w-5 h-5 ${iconColor}`} />
           </div>
-          <span className={`inline-flex items-center gap-0.5 text-xs font-semibold px-2 py-1 rounded-full ${up ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'}`}>
+          <span className={`inline-flex items-center gap-0.5 text-xs font-semibold px-2 py-1 rounded-full ${
+            up ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'
+          }`}>
             {up ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
             {change}
           </span>
@@ -1153,6 +1238,8 @@ create_file "app/frontend/pages/home/index.tsx" do
       </div>
     );
 
+    // ─── Main component ──────────────────────────────────────────────────────────
+
     const HomePage: React.FC = () => {
       const dispatch = useDispatch();
       const user = useSelector((state: RootState) => state.user.user);
@@ -1160,17 +1247,28 @@ create_file "app/frontend/pages/home/index.tsx" do
       const [sidebarOpen, setSidebarOpen] = useState(false);
       const dropdownRef = useRef<HTMLDivElement>(null);
 
-      const handleLogout = () => { dispatch(logoutUser() as any); };
+      const handleLogout = () => {
+        dispatch(logoutUser() as any);
+      };
 
-      const initials = user?.email ? user.email.slice(0, 2).toUpperCase() : 'U';
+      const initials = user?.email
+        ? user.email.slice(0, 2).toUpperCase()
+        : 'U';
+
       const firstName = user?.email?.split('@')[0] ?? 'there';
+
       const hour = new Date().getHours();
       const timeOfDay = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
-      const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+      const today = new Date().toLocaleDateString('en-US', {
+        weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+      });
 
       useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
-          if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) setDropdownOpen(false);
+          if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+            setDropdownOpen(false);
+          }
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -1178,12 +1276,23 @@ create_file "app/frontend/pages/home/index.tsx" do
 
       return (
         <div className="flex h-screen bg-slate-50 overflow-hidden">
+
+          {/* Mobile overlay */}
           {sidebarOpen && (
-            <div className="fixed inset-0 bg-black/50 z-20 lg:hidden backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
+            <div
+              className="fixed inset-0 bg-black/50 z-20 lg:hidden backdrop-blur-sm"
+              onClick={() => setSidebarOpen(false)}
+            />
           )}
 
-          {/* Sidebar */}
-          <aside className={`fixed lg:static inset-y-0 left-0 z-30 w-64 bg-slate-900 flex flex-col shrink-0 transform transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+          {/* ── Sidebar ── */}
+          <aside className={`
+            fixed lg:static inset-y-0 left-0 z-30
+            w-64 bg-slate-900 flex flex-col shrink-0
+            transform transition-transform duration-300 ease-in-out
+            ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+          `}>
+            {/* Logo */}
             <div className="h-14 flex items-center justify-between px-5 border-b border-slate-700/50 shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-xl bg-teal-600 flex items-center justify-center shadow-lg shadow-teal-900/60">
@@ -1191,47 +1300,73 @@ create_file "app/frontend/pages/home/index.tsx" do
                 </div>
                 <span className="text-white font-bold text-base tracking-tight">AppName</span>
               </div>
-              <button onClick={() => setSidebarOpen(false)} className="lg:hidden p-1 text-slate-500 hover:text-slate-300 transition-colors">
+              <button
+                onClick={() => setSidebarOpen(false)}
+                className="lg:hidden p-1 text-slate-500 hover:text-slate-300 transition-colors"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
+            {/* Nav label */}
             <div className="px-5 pt-5 pb-2">
               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.12em]">Main Menu</p>
             </div>
 
+            {/* Nav items */}
             <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto">
               {navItems.map(({ label, icon: Icon, active }) => (
                 <button
                   key={label}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150 text-left ${active ? 'bg-teal-600/15 text-teal-400 border-l-2 border-teal-500 pl-[10px]' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100 border-l-2 border-transparent pl-[10px]'}`}
+                  className={`
+                    w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+                    transition-colors duration-150 text-left
+                    ${active
+                      ? 'bg-teal-600/15 text-teal-400 border-l-2 border-teal-500 pl-[10px]'
+                      : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100 border-l-2 border-transparent pl-[10px]'
+                    }
+                  `}
                 >
                   <Icon className="w-4 h-4 shrink-0" />
                   {label}
-                  {active && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-teal-400" />}
+                  {active && (
+                    <span className="ml-auto w-1.5 h-1.5 rounded-full bg-teal-400" />
+                  )}
                 </button>
               ))}
             </nav>
 
+            {/* Bottom user section */}
             <div className="p-3 border-t border-slate-700/50 shrink-0">
               <div className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-slate-800 transition-colors group">
-                <div className="w-8 h-8 rounded-lg bg-teal-600 flex items-center justify-center text-xs font-bold text-white shrink-0">{initials}</div>
+                <div className="w-8 h-8 rounded-lg bg-teal-600 flex items-center justify-center text-xs font-bold text-white shrink-0">
+                  {initials}
+                </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-semibold text-slate-300 truncate">{user?.email}</p>
                   <p className="text-[10px] text-slate-500 font-medium">Administrator</p>
                 </div>
-                <button onClick={handleLogout} title="Sign out" className="p-1 text-slate-500 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100">
+                <button
+                  onClick={handleLogout}
+                  title="Sign out"
+                  className="p-1 text-slate-500 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                >
                   <LogOut className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
           </aside>
 
-          {/* Main */}
+          {/* ── Main ── */}
           <div className="flex-1 flex flex-col min-w-0">
+
+            {/* Header */}
             <header className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-4 lg:px-6 shrink-0 shadow-sm">
               <div className="flex items-center gap-3">
-                <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors">
+                <button
+                  onClick={() => setSidebarOpen(true)}
+                  className="lg:hidden p-2 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors"
+                >
                   <Menu className="w-5 h-5" />
                 </button>
                 <div>
@@ -1241,19 +1376,25 @@ create_file "app/frontend/pages/home/index.tsx" do
               </div>
 
               <div className="flex items-center gap-2">
+                {/* Notifications */}
                 <button className="relative p-2 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors duration-150">
                   <Bell className="w-4.5 h-4.5" />
                   <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-red-500 rounded-full ring-2 ring-white" />
                 </button>
 
+                {/* User dropdown */}
                 <div className="relative" ref={dropdownRef}>
                   <button
                     onClick={() => setDropdownOpen((prev) => !prev)}
                     aria-expanded={dropdownOpen}
                     className="flex items-center gap-2 pl-1 pr-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors duration-150"
                   >
-                    <div className="w-7 h-7 rounded-lg bg-teal-600 flex items-center justify-center text-[11px] font-bold text-white shrink-0">{initials}</div>
-                    <span className="text-sm font-medium text-slate-700 max-w-[140px] truncate hidden sm:block">{user?.email}</span>
+                    <div className="w-7 h-7 rounded-lg bg-teal-600 flex items-center justify-center text-[11px] font-bold text-white shrink-0">
+                      {initials}
+                    </div>
+                    <span className="text-sm font-medium text-slate-700 max-w-[140px] truncate hidden sm:block">
+                      {user?.email}
+                    </span>
                     <ChevronDown className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform duration-150 ${dropdownOpen ? 'rotate-180' : ''}`} />
                   </button>
 
@@ -1265,15 +1406,21 @@ create_file "app/frontend/pages/home/index.tsx" do
                       </div>
                       <div className="py-1">
                         <button className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
-                          <User className="w-4 h-4 text-slate-400 shrink-0" />Profile
+                          <User className="w-4 h-4 text-slate-400 shrink-0" />
+                          Profile
                         </button>
                         <button className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
-                          <Settings className="w-4 h-4 text-slate-400 shrink-0" />Settings
+                          <Settings className="w-4 h-4 text-slate-400 shrink-0" />
+                          Settings
                         </button>
                       </div>
                       <div className="border-t border-slate-100 py-1">
-                        <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors">
-                          <LogOut className="w-4 h-4 shrink-0" />Sign out
+                        <button
+                          onClick={handleLogout}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                        >
+                          <LogOut className="w-4 h-4 shrink-0" />
+                          Sign out
                         </button>
                       </div>
                     </div>
@@ -1282,20 +1429,30 @@ create_file "app/frontend/pages/home/index.tsx" do
               </div>
             </header>
 
+            {/* Content */}
             <main className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-5">
+
               {/* Welcome banner */}
               <div className="relative rounded-2xl overflow-hidden bg-gradient-to-r from-slate-950 via-teal-950 to-slate-950 animate-gradient-shift">
                 <div className="absolute inset-0 pointer-events-none">
                   <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full bg-teal-500/25 blur-3xl" />
                   <div className="absolute -bottom-16 left-1/4 w-48 h-48 rounded-full bg-cyan-500/20 blur-3xl" />
-                  <div className="absolute inset-0 opacity-[0.04]" style={{ backgroundImage: 'radial-gradient(circle, #fff 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+                  <div
+                    className="absolute inset-0 opacity-[0.04]"
+                    style={{
+                      backgroundImage: 'radial-gradient(circle, #fff 1px, transparent 1px)',
+                      backgroundSize: '24px 24px',
+                    }}
+                  />
                 </div>
                 <div className="relative z-10 px-6 py-6 lg:px-8 lg:py-7">
                   <p className="text-teal-400 text-xs font-semibold uppercase tracking-widest mb-1">Overview</p>
                   <h2 className="text-xl lg:text-2xl font-bold text-white tracking-tight">
                     Good {timeOfDay}, <span className="text-teal-300">{firstName}</span> 👋
                   </h2>
-                  <p className="text-slate-400 text-sm mt-1.5 max-w-md">Your platform is running smoothly. Here's a summary of today's activity.</p>
+                  <p className="text-slate-400 text-sm mt-1.5 max-w-md">
+                    Your platform is running smoothly. Here's a summary of today's activity.
+                  </p>
                   <button className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-sm font-semibold transition-all duration-150 shadow-lg shadow-teal-900/40 group">
                     View full report
                     <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform duration-150" />
@@ -1305,16 +1462,21 @@ create_file "app/frontend/pages/home/index.tsx" do
 
               {/* Stat cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-                {statCards.map((card) => <StatCard key={card.label} {...card} />)}
+                {statCards.map((card) => (
+                  <StatCard key={card.label} {...card} />
+                ))}
               </div>
 
-              {/* Bottom row */}
+              {/* Bottom row: Activity + Performance */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+                {/* Recent Activity (2/3) */}
                 <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
                   <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
                     <h3 className="text-sm font-bold text-slate-900">Recent Activity</h3>
                     <button className="flex items-center gap-1 text-xs font-semibold text-teal-600 hover:text-teal-700 transition-colors group">
-                      View all<ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+                      View all
+                      <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
                     </button>
                   </div>
                   <div className="divide-y divide-slate-50">
@@ -1336,6 +1498,7 @@ create_file "app/frontend/pages/home/index.tsx" do
                   </div>
                 </div>
 
+                {/* Performance Metrics (1/3) */}
                 <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
                   <div className="px-6 py-4 border-b border-slate-100">
                     <h3 className="text-sm font-bold text-slate-900">Performance</h3>
@@ -1349,13 +1512,17 @@ create_file "app/frontend/pages/home/index.tsx" do
                           <span className="text-xs font-bold text-slate-800">{m.pct}%</span>
                         </div>
                         <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                          <div className={`h-full rounded-full bg-gradient-to-r ${m.gradient}`} style={{ width: `${m.pct}%` }} />
+                          <div
+                            className={`h-full rounded-full bg-gradient-to-r ${m.gradient}`}
+                            style={{ width: `${m.pct}%` }}
+                          />
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
               </div>
+
             </main>
           </div>
         </div>
@@ -1568,13 +1735,13 @@ end
 
 # ── Devise + JWT ──────────────────────────────────────────────
 say "== Installing Devise ==", :green
-run "bundle exec rails generate devise:install"
+run! "bundle exec rails generate devise:install"
 
 say "== Generating User model with Devise ==", :green
-run "bundle exec rails generate devise User"
+run! "bundle exec rails generate devise User"
 
 # Add JTI to users
-run "bundle exec rails generate migration AddJtiToUsers jti:string:uniq:not_null"
+run! "bundle exec rails generate migration AddJtiToUsers jti:string:uniq:not_null"
 
 # Overwrite User model with JWT support
 remove_file "app/models/user.rb"
@@ -1656,7 +1823,7 @@ end
 
 # ── RSpec ─────────────────────────────────────────────────────
 say "== Installing RSpec ==", :green
-run "bundle exec rails generate rspec:install"
+run! "bundle exec rails generate rspec:install"
 
 # rails_helper additions
 inject_into_file "spec/rails_helper.rb", after: "require 'rspec/rails'\n" do
@@ -2166,15 +2333,12 @@ create_file "swagger/v1/swagger.yaml" do
   YAML
 end
 
-# ── DB + credentials + JWT config ────────────────────────────
+# ── Credentials + JWT config ─────────────────────────────────
 # Strict order required:
-#   1. DB created + migrated — migrations are on disk, no initializer JWT yet
-#   2. Credential written — no KeyError when initializer loads next
-#   3. JWT config appended — bang method safe, credential is present
-say "== Creating and migrating database ==", :green
-run "bin/rails db:create"
-run "bin/rails db:migrate"
-
+#   1. Credential written first — no KeyError when the initializer loads next
+#   2. JWT config appended after — the bang method is safe, credential present
+# DB setup is intentionally NOT run here: generation must not depend on a live
+# PostgreSQL. The user runs db:create/db:migrate as the first setup step.
 say "== Writing devise_jwt_secret_key credential ==", :green
 # Rails 8.1: credentials.write requires the content as an argument.
 # Use File.write/delete directly to avoid create_file tracking.
@@ -2195,10 +2359,10 @@ append_to_file "config/initializers/devise.rb" do
       config.jwt do |jwt|
         jwt.secret = Rails.application.credentials.devise_jwt_secret_key!
         jwt.dispatch_requests = [
-          ['POST', %r{^/login$}]
+          ['POST', %r{^/api/v1/users/sign_in$}]
         ]
         jwt.revocation_requests = [
-          ['DELETE', %r{^/logout$}]
+          ['DELETE', %r{^/api/v1/users/sign_out$}]
         ]
         jwt.expiration_time = 5.minutes.to_i
       end
@@ -2213,12 +2377,14 @@ say "  Template applied successfully!", :green
 say "================================================================", :green
 say ""
 say "Next steps:"
-say "  1. Start the dev server:"
+say "  1. Set up the database:"
+say "     bin/rails db:create db:migrate"
+say "  2. Start the dev server:"
 say "     bin/dev  (requires Foreman: gem install foreman)"
-say "  2. Rename the app:"
+say "  3. Rename the app:"
 say "     rails app:rename[MyNewAppName]"
 say ""
-say "  (db:create, db:migrate, and credentials were set up automatically)"
+say "  (the devise_jwt_secret_key credential was generated automatically)"
 say ""
 say "URLs:"
 say "  App:     http://localhost:3000"
