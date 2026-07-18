@@ -47,7 +47,7 @@ class AuthService {
       }
 
       const body = await response.json().catch(() => ({}));
-      const user = body?.status?.data?.user;
+      const user = body?.data?.user;
 
       return { token, user };
     } catch (error) {

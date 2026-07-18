@@ -35,12 +35,9 @@ RSpec.describe 'Sessions' do
           run_test! do |response|
             expect(response).to have_http_status :ok
             expect(json_response).to include(
-              status: include(
-                code: 200,
-                data: include(
-                  user: include(email: 'sample@email.com')
-                ),
-                message: 'Logged in successfully.',
+              status: include(code: 200, message: 'Logged in successfully.'),
+              data: include(
+                user: include(email: 'sample@email.com')
               )
             )
           end
@@ -72,8 +69,7 @@ RSpec.describe 'Sessions' do
           run_test! do |response|
             expect(response).to have_http_status :ok
             expect(json_response).to include(
-              message: 'Logged out successfully.',
-              status: 200
+              status: include(code: 200, message: 'Logged out successfully.')
             )
           end
         end

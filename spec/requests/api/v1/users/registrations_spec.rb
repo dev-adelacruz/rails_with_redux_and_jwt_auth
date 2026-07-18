@@ -53,7 +53,7 @@ RSpec.describe 'Registrations' do
           run_test! do |response|
             expect(response).to have_http_status :unprocessable_entity
             expect(json_response).to include(
-              message: "User couldn't be created successfully. Email is invalid"
+              status: include(code: 422, message: "User couldn't be created successfully. Email is invalid")
             )
           end
         end
@@ -72,7 +72,7 @@ RSpec.describe 'Registrations' do
           run_test! do |response|
             expect(response).to have_http_status :unprocessable_entity
             expect(json_response).to include(
-              message: "User couldn't be created successfully. Password confirmation doesn't match Password"
+              status: include(code: 422, message: "User couldn't be created successfully. Password confirmation doesn't match Password")
             )
           end
         end
@@ -95,7 +95,7 @@ RSpec.describe 'Registrations' do
           run_test! do |response|
             expect(response).to have_http_status :unprocessable_entity
             expect(json_response).to include(
-              message: "User couldn't be created successfully. Email has already been taken"
+              status: include(code: 422, message: "User couldn't be created successfully. Email has already been taken")
             )
           end
         end

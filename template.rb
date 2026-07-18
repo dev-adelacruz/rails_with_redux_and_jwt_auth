@@ -538,7 +538,7 @@ create_file "app/frontend/services/authService.ts" do
           }
 
           const body = await response.json().catch(() => ({}));
-          const user = body?.status?.data?.user;
+          const user = body?.data?.user;
 
           return { token, user };
         } catch (error) {
@@ -1456,35 +1456,29 @@ create_file "app/controllers/api/v1/users/sessions_controller.rb" do
         sign_in(resource_name, resource)
 
         render json: {
-          status: { 
-            code: 200, message: 'Logged in successfully.',
-            data: { user: UserBlueprint.render_as_hash(current_user) }
-          }
+          status: { code: 200, message: 'Logged in successfully.' },
+          data: { user: UserBlueprint.render_as_hash(current_user) }
         }, status: :ok
       end
 
       def destroy
         signed_out = (Devise.sign_out_all_scopes ? sign_out : sign_out(resource_name))
-        
+
         if signed_out
           render json: {
-            status: 200,
-            message: 'Logged out successfully.'
+            status: { code: 200, message: 'Logged out successfully.' }
           }, status: :ok
         else
           render json: {
-            status: 422,
-            message: "There was a problem logging out."
+            status: { code: 422, message: 'There was a problem logging out.' }
           }, status: :unprocessable_entity
         end
       end
-      
+
       def respond_with(current_user, _opts = {})
         render json: {
-          status: { 
-            code: 200, message: 'Logged in successfully.',
-            data: { user: UserBlueprint.render_as_hash(current_user) }
-          }
+          status: { code: 200, message: 'Logged in successfully.' },
+          data: { user: UserBlueprint.render_as_hash(current_user) }
         }, status: :ok
       end
 
@@ -1492,15 +1486,12 @@ create_file "app/controllers/api/v1/users/sessions_controller.rb" do
       def validate_token
         if current_user
           render json: {
-            status: { 
-              code: 200, message: 'Token is valid.',
-              data: { user: UserBlueprint.render_as_hash(current_user) }
-            }
+            status: { code: 200, message: 'Token is valid.' },
+            data: { user: UserBlueprint.render_as_hash(current_user) }
           }, status: :ok
         else
           render json: {
-            status: 401,
-            message: "Invalid or expired token."
+            status: { code: 401, message: 'Invalid or expired token.' }
           }, status: :unauthorized
         end
       end
@@ -1520,7 +1511,10 @@ create_file "app/controllers/api/v1/users/registrations_controller.rb" do
           }
         else
           render json: {
-            message: "User couldn't be created successfully. #{current_user.errors.full_messages.to_sentence}"
+            status: {
+              code: 422,
+              message: "User couldn't be created successfully. #{current_user.errors.full_messages.to_sentence}"
+            }
           }, status: :unprocessable_entity
         end
       end
@@ -1847,7 +1841,7 @@ create_file "spec/requests/api/v1/users/registrations_spec.rb" do
               run_test! do |response|
                 expect(response).to have_http_status :unprocessable_entity
                 expect(json_response).to include(
-                  message: "User couldn't be created successfully. Email is invalid"
+                  status: include(code: 422, message: "User couldn't be created successfully. Email is invalid")
                 )
               end
             end
@@ -1866,7 +1860,7 @@ create_file "spec/requests/api/v1/users/registrations_spec.rb" do
               run_test! do |response|
                 expect(response).to have_http_status :unprocessable_entity
                 expect(json_response).to include(
-                  message: "User couldn't be created successfully. Password confirmation doesn't match Password"
+                  status: include(code: 422, message: "User couldn't be created successfully. Password confirmation doesn't match Password")
                 )
               end
             end
@@ -1889,7 +1883,7 @@ create_file "spec/requests/api/v1/users/registrations_spec.rb" do
               run_test! do |response|
                 expect(response).to have_http_status :unprocessable_entity
                 expect(json_response).to include(
-                  message: "User couldn't be created successfully. Email has already been taken"
+                  status: include(code: 422, message: "User couldn't be created successfully. Email has already been taken")
                 )
               end
             end
@@ -1939,12 +1933,9 @@ create_file "spec/requests/api/v1/users/sessions_spec.rb" do
               run_test! do |response|
                 expect(response).to have_http_status :ok
                 expect(json_response).to include(
-                  status: include(
-                    code: 200,
-                    data: include(
-                      user: include(email: 'sample@email.com')
-                    ),
-                    message: 'Logged in successfully.',
+                  status: include(code: 200, message: 'Logged in successfully.'),
+                  data: include(
+                    user: include(email: 'sample@email.com')
                   )
                 )
               end
@@ -1976,8 +1967,7 @@ create_file "spec/requests/api/v1/users/sessions_spec.rb" do
               run_test! do |response|
                 expect(response).to have_http_status :ok
                 expect(json_response).to include(
-                  message: 'Logged out successfully.',
-                  status: 200
+                  status: include(code: 200, message: 'Logged out successfully.')
                 )
               end
             end
@@ -2234,24 +2224,28 @@ RUBY
 rails_command "runner tmp/write_credential.rb"
 File.delete(credential_script)
 
-say "== Appending JWT config to Devise initializer ==", :green
-append_to_file "config/initializers/devise.rb" do
-  <<~RUBY
+say "== Injecting JWT config into Devise initializer ==", :green
+# Inject into the existing `Devise.setup do |config|` block (before its final
+# `end`) rather than appending a second Devise.setup block. If the anchor is
+# ever not found, this raises instead of silently producing an app without JWT.
+jwt_config = <<~RUBY
+  config.jwt do |jwt|
+    jwt.secret = Rails.application.credentials.devise_jwt_secret_key!
+    jwt.dispatch_requests = [
+      ['POST', %r{^/api/v1/users/sign_in$}]
+    ]
+    jwt.revocation_requests = [
+      ['DELETE', %r{^/api/v1/users/sign_out$}]
+    ]
+    jwt.expiration_time = ENV.fetch('JWT_EXPIRATION_MINUTES', '60').to_i.minutes.to_i
+  end
+RUBY
 
-    Devise.setup do |config|
-      config.jwt do |jwt|
-        jwt.secret = Rails.application.credentials.devise_jwt_secret_key!
-        jwt.dispatch_requests = [
-          ['POST', %r{^/api/v1/users/sign_in$}]
-        ]
-        jwt.revocation_requests = [
-          ['DELETE', %r{^/api/v1/users/sign_out$}]
-        ]
-        jwt.expiration_time = ENV.fetch('JWT_EXPIRATION_MINUTES', '60').to_i.minutes.to_i
-      end
-    end
-  RUBY
+devise_rb = File.join(destination_root, "config/initializers/devise.rb")
+unless File.read(devise_rb).match?(/^end\s*\z/)
+  raise "Could not find the closing `end` of Devise.setup in devise.rb to inject JWT config"
 end
+inject_into_file devise_rb, "\n" + jwt_config.gsub(/^(?=.)/, "  "), before: /^end\s*\z/
 
 # ── Final instructions ────────────────────────────────────────
 say "", :green
