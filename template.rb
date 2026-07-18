@@ -77,7 +77,7 @@ run! "yarn add --dev @vitejs/plugin-react@^4.3.4 @types/react@^18.1.0 @types/rea
 # ── vite.config.ts ───────────────────────────────────────────
 say "== Writing vite.config.ts ==", :green
 create_file "vite.config.ts", force: true do
-  <<~TS
+  <<~'TS'
     import { defineConfig } from 'vite'
     import RubyPlugin from 'vite-plugin-ruby'
     import tailwindcss from "@tailwindcss/vite";
@@ -94,7 +94,7 @@ end
 # ── tsconfig.json ────────────────────────────────────────────
 say "== Writing tsconfig.json ==", :green
 create_file "tsconfig.json", force: true do
-  <<~JSON
+  <<~'JSON'
     {
       "compilerOptions": {
         "target": "ESNext",
@@ -127,7 +127,7 @@ end
 # ── tailwind.config.js ───────────────────────────────────────
 say "== Writing tailwind.config.js ==", :green
 create_file "tailwind.config.js", force: true do
-  <<~JS
+  <<~'JS'
     // tailwind.config.js
 
     module.exports = {
@@ -144,7 +144,7 @@ end
 
 # ── Procfile.dev ─────────────────────────────────────────────
 create_file "Procfile.dev", force: true do
-  <<~PROC
+  <<~'PROC'
 
     vite: bin/vite dev
     web: bin/rails s -p 3000
@@ -155,7 +155,7 @@ end
 say "== Updating application layout ==", :green
 remove_file "app/views/layouts/application.html.erb"
 create_file "app/views/layouts/application.html.erb" do
-  <<~ERB
+  <<~'ERB'
     <!DOCTYPE html>
     <html>
       <head>
@@ -184,7 +184,7 @@ say "== Creating frontend structure ==", :green
 
 # Tailwind CSS
 create_file "app/frontend/assets/styles/tailwind.css" do
-  <<~CSS
+  <<~'CSS'
     @import 'tailwindcss';
 
     @keyframes gradient-shift {
@@ -234,7 +234,7 @@ end
 
 # Entrypoint
 create_file "app/frontend/entrypoints/application.tsx" do
-  <<~TSX
+  <<~'TSX'
     import { createRoot } from 'react-dom/client';
     import { App } from '../App';
     import { Provider } from 'react-redux';
@@ -255,7 +255,7 @@ end
 
 # App.tsx
 create_file "app/frontend/App.tsx" do
-  <<~TSX
+  <<~'TSX'
     import { FC, useEffect } from 'react';
     import { useDispatch } from 'react-redux';
     import { checkAuthStatus } from './state/user/userSlice';
@@ -281,7 +281,7 @@ end
 
 # Routes
 create_file "app/frontend/routes/index.tsx" do
-  <<~TSX
+  <<~'TSX'
     import React from 'react';
     import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
     import HomePage from '../pages/home';
@@ -309,7 +309,7 @@ end
 
 # Redux store
 create_file "app/frontend/state/store.tsx" do
-  <<~TSX
+  <<~'TSX'
     import { configureStore } from '@reduxjs/toolkit';
     import userReducer from './user/userSlice';
 
@@ -326,7 +326,7 @@ end
 
 # UserState interface
 create_file "app/frontend/interfaces/state/userState.tsx" do
-  <<~TSX
+  <<~'TSX'
     interface UserState {
       isSignedIn: boolean;
       token: string | null;
@@ -342,7 +342,7 @@ end
 
 # User slice
 create_file "app/frontend/state/user/userSlice.tsx" do
-  <<~TSX
+  <<~'TSX'
     import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
     import { authService } from '../../services/authService';
     import { tokenStorage } from '../../services/tokenStorage';
@@ -353,11 +353,8 @@ create_file "app/frontend/state/user/userSlice.tsx" do
       async (credentials: { email: string; password: string }, { rejectWithValue }) => {
         try {
           const response = await authService.login(credentials);
-          // Store token in localStorage without encryption for persistence
-          await tokenStorage.storeToken(response.token, {
-            encrypt: false,
-            storageType: 'local'
-          });
+          // Persist the token in localStorage so the session survives a reload.
+          tokenStorage.storeToken(response.token, { storageType: 'local' });
           return response;
         } catch (error: any) {
           return rejectWithValue(error.message || 'Login failed');
@@ -383,8 +380,8 @@ create_file "app/frontend/state/user/userSlice.tsx" do
       'user/checkAuth',
       async (_, { rejectWithValue }) => {
         try {
-          const token = await tokenStorage.getToken();
-          
+          const token = tokenStorage.getToken();
+
           if (token) {
             const isValid = await authService.validateToken(token);
             
@@ -489,7 +486,7 @@ end
 
 # Auth service
 create_file "app/frontend/services/authService.ts" do
-  <<~TS
+  <<~'TS'
     // Authentication service for handling API calls
     export interface LoginCredentials {
       email: string;
@@ -579,9 +576,7 @@ create_file "app/frontend/services/authService.ts" do
             },
           });
 
-          console.log('Token validation response status:', response.status);
           if (!response.ok) {
-            console.log('Token validation failed with status:', response.status);
             return false;
           }
           return true;
@@ -604,152 +599,42 @@ end
 
 # Token storage
 create_file "app/frontend/services/tokenStorage.ts" do
-  <<~TS
-    // Token storage service with encryption and security features
+  <<~'TS'
+    // Token storage backed by localStorage / sessionStorage.
 
     export interface TokenStorageOptions {
-      encrypt?: boolean;
       storageType: 'local' | 'session';
     }
 
     class TokenStorage {
       private readonly TOKEN_KEY = 'auth_token';
       private readonly STORAGE_TYPE_KEY = 'auth_storage_type';
-      private encryptionKey: CryptoKey | null = null;
 
-      // Initialize encryption if needed
-      async initializeEncryption(): Promise<void> {
-        if (typeof window !== 'undefined' && window.crypto) {
-          try {
-            this.encryptionKey = await crypto.subtle.generateKey(
-              {
-                name: 'AES-GCM',
-                length: 256,
-              },
-              true,
-              ['encrypt', 'decrypt']
-            );
-          } catch (error) {
-            console.warn('Web Crypto API not available, falling back to plain text storage');
-            this.encryptionKey = null;
-          }
-        }
-      }
-
-      // Encrypt token using Web Crypto API
-      private async encryptToken(token: string): Promise<string> {
-        if (!this.encryptionKey) {
-          return token; // Fallback to plain text if encryption is not available
-        }
-
-        try {
-          const encoder = new TextEncoder();
-          const data = encoder.encode(token);
-          const iv = crypto.getRandomValues(new Uint8Array(12));
-          
-          const encrypted = await crypto.subtle.encrypt(
-            {
-              name: 'AES-GCM',
-              iv: iv,
-            },
-            this.encryptionKey,
-            data
-          );
-
-          // Combine IV and encrypted data for storage
-          const combined = new Uint8Array(iv.length + encrypted.byteLength);
-          combined.set(iv, 0);
-          combined.set(new Uint8Array(encrypted), iv.length);
-
-          return btoa(String.fromCharCode(...combined));
-        } catch (error) {
-          console.error('Encryption failed:', error);
-          return token; // Fallback to plain text
-        }
-      }
-
-      // Decrypt token using Web Crypto API
-      private async decryptToken(encryptedToken: string): Promise<string> {
-        if (!this.encryptionKey) {
-          return encryptedToken; // Return as is if encryption was not used
-        }
-
-        try {
-          const combined = Uint8Array.from(atob(encryptedToken), c => c.charCodeAt(0));
-          const iv = combined.slice(0, 12);
-          const encryptedData = combined.slice(12);
-
-          const decrypted = await crypto.subtle.decrypt(
-            {
-              name: 'AES-GCM',
-              iv: iv,
-            },
-            this.encryptionKey,
-            encryptedData
-          );
-
-          const decoder = new TextDecoder();
-          return decoder.decode(decrypted);
-        } catch (error) {
-          console.error('Decryption failed:', error);
-          return encryptedToken; // Return as is if decryption fails
-        }
-      }
-
-      // Store token with specified storage type
-      async storeToken(token: string, options: TokenStorageOptions): Promise<void> {
-        await this.initializeEncryption();
-        
-        let tokenToStore = token;
-        if (options.encrypt && this.encryptionKey) {
-          tokenToStore = await this.encryptToken(token);
-        }
-
+      // Store the token in the requested storage location.
+      storeToken(token: string, options: TokenStorageOptions): void {
         const storage = options.storageType === 'local' ? localStorage : sessionStorage;
-        
-        storage.setItem(this.TOKEN_KEY, tokenToStore);
+        storage.setItem(this.TOKEN_KEY, token);
         localStorage.setItem(this.STORAGE_TYPE_KEY, options.storageType);
       }
 
-      // Retrieve token from storage
-      async getToken(): Promise<string | null> {
-        await this.initializeEncryption();
-        
-        // Check both storage locations
-        let encryptedToken = localStorage.getItem(this.TOKEN_KEY) || sessionStorage.getItem(this.TOKEN_KEY);
-        
-        if (!encryptedToken) {
-          return null;
-        }
-
-        // Get storage type to determine if encryption was used
-        const storageType = localStorage.getItem(this.STORAGE_TYPE_KEY) as 'local' | 'session' | null;
-        
-        if (storageType && this.encryptionKey) {
-          try {
-            return await this.decryptToken(encryptedToken);
-          } catch (error) {
-            console.error('Failed to decrypt token:', error);
-            return encryptedToken; // Return encrypted token as fallback
-          }
-        }
-
-        return encryptedToken;
+      // Retrieve the token from whichever storage holds it.
+      getToken(): string | null {
+        return localStorage.getItem(this.TOKEN_KEY) || sessionStorage.getItem(this.TOKEN_KEY);
       }
 
-      // Clear token from all storage locations
+      // Clear the token from all storage locations.
       clearToken(): void {
         localStorage.removeItem(this.TOKEN_KEY);
         sessionStorage.removeItem(this.TOKEN_KEY);
         localStorage.removeItem(this.STORAGE_TYPE_KEY);
       }
 
-      // Get the storage type used for the current token
+      // Get the storage type used for the current token.
       getStorageType(): 'local' | 'session' | null {
         return localStorage.getItem(this.STORAGE_TYPE_KEY) as 'local' | 'session' | null;
       }
 
-      // Check if a token exists
+      // Check if a token exists.
       hasToken(): boolean {
         return !!(localStorage.getItem(this.TOKEN_KEY) || sessionStorage.getItem(this.TOKEN_KEY));
       }
@@ -761,7 +646,7 @@ end
 
 # ProtectedRoute
 create_file "app/frontend/components/ProtectedRoute.tsx" do
-  <<~TSX
+  <<~'TSX'
     import React, { useEffect, useState } from 'react';
     import { Navigate } from 'react-router-dom';
     import { useSelector } from 'react-redux';
@@ -806,7 +691,7 @@ end
 
 # LoginForm
 create_file "app/frontend/components/auth/LoginForm.tsx" do
-  <<~TSX
+  <<~'TSX'
     import React, { useState } from 'react';
     import { useDispatch, useSelector } from 'react-redux';
     import { AppDispatch, RootState } from '../../state/store';
@@ -838,8 +723,7 @@ create_file "app/frontend/components/auth/LoginForm.tsx" do
         const result = await dispatch(loginUser({ email, password }));
 
         if (loginUser.fulfilled.match(result)) {
-          await tokenStorage.storeToken(result.payload.token, {
-            encrypt: true,
+          tokenStorage.storeToken(result.payload.token, {
             storageType: rememberMe ? 'local' : 'session',
           });
           onSuccess();
@@ -956,7 +840,7 @@ end
 
 # Login page
 create_file "app/frontend/pages/login/index.tsx" do
-  <<~TSX
+  <<~'TSX'
     import React from 'react';
     import { useNavigate } from 'react-router-dom';
     import LoginForm from '../../components/auth/LoginForm';
@@ -1090,7 +974,7 @@ end
 
 # Home page
 create_file "app/frontend/pages/home/index.tsx" do
-  <<~TSX
+  <<~'TSX'
     import React, { useRef, useState, useEffect } from 'react';
     import { useDispatch, useSelector } from 'react-redux';
     import { logoutUser } from '../../state/user/userSlice';
@@ -1539,7 +1423,7 @@ say "== Setting up Rails backend ==", :green
 # ApplicationController
 remove_file "app/controllers/application_controller.rb"
 create_file "app/controllers/application_controller.rb" do
-  <<~RUBY
+  <<~'RUBY'
     # frozen_string_literal: true
 
     class ApplicationController < ActionController::Base
@@ -1550,7 +1434,7 @@ end
 
 # RootController
 create_file "app/controllers/root_controller.rb" do
-  <<~RUBY
+  <<~'RUBY'
     # frozen_string_literal: true
     class RootController < ApplicationController
       def index
@@ -1565,7 +1449,7 @@ create_file "app/views/root/index.html.erb", ""
 empty_directory "app/controllers/api/v1/users"
 
 create_file "app/controllers/api/v1/users/sessions_controller.rb" do
-  <<~RUBY
+  <<~'RUBY'
     # frozen_string_literal: true
 
     class Api::V1::Users::SessionsController < Devise::SessionsController
@@ -1593,7 +1477,7 @@ create_file "app/controllers/api/v1/users/sessions_controller.rb" do
           render json: {
             status: 422,
             message: "There was a problem logging out."
-          }, status: :unproccessable_entity
+          }, status: :unprocessable_entity
         end
       end
       
@@ -1627,7 +1511,7 @@ create_file "app/controllers/api/v1/users/sessions_controller.rb" do
 end
 
 create_file "app/controllers/api/v1/users/registrations_controller.rb" do
-  <<~RUBY
+  <<~'RUBY'
     # frozen_string_literal: true
     class Api::V1::Users::RegistrationsController < Devise::RegistrationsController
       def respond_with(current_user, _opts = {})
@@ -1638,7 +1522,7 @@ create_file "app/controllers/api/v1/users/registrations_controller.rb" do
           }
         else
           render json: {
-            message: "User couldn't be created successfully. \#{current_user.errors.full_messages.to_sentence}"
+            message: "User couldn't be created successfully. #{current_user.errors.full_messages.to_sentence}"
           }, status: :unprocessable_entity
         end
       end
@@ -1649,7 +1533,7 @@ end
 # Blueprint
 empty_directory "app/blueprints"
 create_file "app/blueprints/user_blueprint.rb" do
-  <<~RUBY
+  <<~'RUBY'
     # frozen_string_literal: true
     class UserBlueprint < Blueprinter::Base
       identifier :id
@@ -1666,7 +1550,7 @@ end
 # written in after_bundle (Phase 2) once the User model and DB are ready.
 remove_file "config/routes.rb"
 create_file "config/routes.rb" do
-  <<~RUBY
+  <<~'RUBY'
     # frozen_string_literal: true
 
     Rails.application.routes.draw do
@@ -1679,7 +1563,7 @@ empty_directory "config/routes"
 
 # CORS initializer
 create_file "config/initializers/cors.rb" do
-  <<~RUBY
+  <<~'RUBY'
     Rails.application.config.middleware.insert_before 0, Rack::Cors do
       allow do
         origins '*' # later change to the domain of the frontend app
@@ -1694,7 +1578,7 @@ end
 
 # RSwag initializers
 create_file "config/initializers/rswag_api.rb" do
-  <<~RUBY
+  <<~'RUBY'
     Rswag::Api.configure do |c|
 
       # Specify a root folder where Swagger JSON files are located
@@ -1713,7 +1597,7 @@ create_file "config/initializers/rswag_api.rb" do
 end
 
 create_file "config/initializers/rswag_ui.rb" do
-  <<~RUBY
+  <<~'RUBY'
     Rswag::Ui.configure do |c|
 
       # List the Swagger endpoints that you want to be documented through the
@@ -1746,7 +1630,7 @@ run! "bundle exec rails generate migration AddJtiToUsers jti:string:uniq:not_nul
 # Overwrite User model with JWT support
 remove_file "app/models/user.rb"
 create_file "app/models/user.rb" do
-  <<~RUBY
+  <<~'RUBY'
     # frozen_string_literal: true
 
     class User < ApplicationRecord
@@ -1770,7 +1654,7 @@ end
 say "== Writing full routes (Phase 2) ==", :green
 
 create_file "config/routes.rb", force: true do
-  <<~RUBY
+  <<~'RUBY'
     # frozen_string_literal: true
 
     Rails.application.routes.draw do
@@ -1786,7 +1670,7 @@ create_file "config/routes.rb", force: true do
 end
 
 create_file "config/routes/api.rb" do
-  <<~RUBY
+  <<~'RUBY'
     # frozen_string_literal: true
 
     namespace :api do
@@ -1796,7 +1680,7 @@ create_file "config/routes/api.rb" do
 end
 
 create_file "config/routes/v1.rb" do
-  <<~RUBY
+  <<~'RUBY'
     # frozen_string_literal: true
 
     namespace :v1 do
@@ -1806,7 +1690,7 @@ create_file "config/routes/v1.rb" do
 end
 
 create_file "config/routes/devise.rb" do
-  <<~RUBY
+  <<~'RUBY'
     # frozen_string_literal: true
 
     devise_for :users, singular: :user, controllers: {
@@ -1840,7 +1724,7 @@ end
 # Support files
 empty_directory "spec/support"
 create_file "spec/support/factory_bot.rb" do
-  <<~RUBY
+  <<~'RUBY'
     # frozen_string_literal: true
     RSpec.configure do |config|
       config.include FactoryBot::Syntax::Methods
@@ -1849,7 +1733,7 @@ create_file "spec/support/factory_bot.rb" do
 end
 
 create_file "spec/support/shoulda_matchers.rb" do
-  <<~RUBY
+  <<~'RUBY'
     # frozen_string_literal: true
     Shoulda::Matchers.configure do |config|
       config.integrate do |with|
@@ -1862,7 +1746,7 @@ end
 
 # User factory
 create_file "spec/factories/users.rb" do
-  <<~RUBY
+  <<~'RUBY'
     # frozen_string_literal: true
 
     FactoryBot.define do
@@ -1876,7 +1760,7 @@ end
 
 # User model spec
 create_file "spec/models/user_spec.rb" do
-  <<~RUBY
+  <<~'RUBY'
     # frozen_string_literal: true
 
     require 'rails_helper'
@@ -1890,7 +1774,7 @@ create_file "spec/models/user_spec.rb" do
 end
 
 create_file "spec/blueprints/user_blueprint_spec.rb" do
-  <<~RUBY
+  <<~'RUBY'
     # frozen_string_literal: true
     require 'rails_helper'
     require './spec/support/shared_examples/blueprints/blueprint'
@@ -1908,7 +1792,7 @@ create_file "spec/blueprints/user_blueprint_spec.rb" do
 end
 
 create_file "spec/requests/api/v1/users/registrations_spec.rb" do
-  <<~RUBY
+  <<~'RUBY'
     # frozen_string_literal: true
 
     require 'swagger_helper'
@@ -2018,7 +1902,7 @@ create_file "spec/requests/api/v1/users/registrations_spec.rb" do
 end
 
 create_file "spec/requests/api/v1/users/sessions_spec.rb" do
-  <<~RUBY
+  <<~'RUBY'
     # frozen_string_literal: true
 
     require 'swagger_helper'
@@ -2140,7 +2024,7 @@ create_file "spec/requests/api/v1/users/sessions_spec.rb" do
 end
 
 create_file "spec/routing/users/sessions_routing_spec.rb" do
-  <<~RUBY
+  <<~'RUBY'
     # frozen_string_literal: true
 
     require 'rails_helper'
@@ -2174,7 +2058,7 @@ create_file "spec/routing/users/sessions_routing_spec.rb" do
 end
 
 create_file "spec/support/shared_examples/blueprints/blueprint.rb" do
-  <<~RUBY
+  <<~'RUBY'
     # frozen_string_literal: true
     RSpec.shared_examples 'a blueprint' do
       let(:custom_attributes) { {} }
@@ -2213,7 +2097,7 @@ create_file "spec/support/shared_examples/blueprints/blueprint.rb" do
 end
 
 create_file "spec/swagger_helper.rb" do
-  <<~RUBY
+  <<~'RUBY'
     # frozen_string_literal: true
 
     require 'rails_helper'
@@ -2263,7 +2147,7 @@ end
 # ── Swagger scaffold ──────────────────────────────────────────
 empty_directory "swagger/v1"
 create_file "swagger/v1/swagger.yaml" do
-  <<~YAML
+  <<~'YAML'
     ---
     openapi: 3.0.1
     info:

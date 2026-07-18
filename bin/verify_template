@@ -34,9 +34,12 @@ end
 # mirroring the `force: true` semantics in the template.
 entries = {}
 
-source.scan(/create_file\s+["']([^"']+)["'][^<\n]*\n\s*<<~(\w+)\n(.*?)\n[ \t]*\2/m) do |path, _delim, raw|
+# Heredocs are single-quoted (<<~'DELIM'), so the raw bytes ARE the exact string
+# the template writes — no interpolation or escape processing to account for.
+# The '?' keeps any legacy unquoted heredoc parseable.
+source.scan(/create_file\s+["']([^"']+)["'][^<\n]*\n\s*<<~'?(\w+)'?\n(.*?)\n[ \t]*\2/m) do |path, _delim, raw|
   next if FILTER && !path.start_with?(FILTER)
-  entries[path] = squiggly_strip(raw).gsub('\#{', '#{').rstrip + "\n"
+  entries[path] = squiggly_strip(raw).rstrip + "\n"
 end
 
 if entries.empty?

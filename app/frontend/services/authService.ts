@@ -87,9 +87,7 @@ class AuthService {
         },
       });
 
-      console.log('Token validation response status:', response.status);
       if (!response.ok) {
-        console.log('Token validation failed with status:', response.status);
         return false;
       }
       return true;

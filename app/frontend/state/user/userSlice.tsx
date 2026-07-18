@@ -8,11 +8,8 @@ export const loginUser = createAsyncThunk(
   async (credentials: { email: string; password: string }, { rejectWithValue }) => {
     try {
       const response = await authService.login(credentials);
-      // Store token in localStorage without encryption for persistence
-      await tokenStorage.storeToken(response.token, {
-        encrypt: false,
-        storageType: 'local'
-      });
+      // Persist the token in localStorage so the session survives a reload.
+      tokenStorage.storeToken(response.token, { storageType: 'local' });
       return response;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Login failed');
@@ -38,8 +35,8 @@ export const checkAuthStatus = createAsyncThunk(
   'user/checkAuth',
   async (_, { rejectWithValue }) => {
     try {
-      const token = await tokenStorage.getToken();
-      
+      const token = tokenStorage.getToken();
+
       if (token) {
         const isValid = await authService.validateToken(token);
         

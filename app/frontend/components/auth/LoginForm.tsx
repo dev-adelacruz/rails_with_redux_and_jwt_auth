@@ -29,8 +29,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
     const result = await dispatch(loginUser({ email, password }));
 
     if (loginUser.fulfilled.match(result)) {
-      await tokenStorage.storeToken(result.payload.token, {
-        encrypt: true,
+      tokenStorage.storeToken(result.payload.token, {
         storageType: rememberMe ? 'local' : 'session',
       });
       onSuccess();

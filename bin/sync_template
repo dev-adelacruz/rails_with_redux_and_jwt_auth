@@ -23,7 +23,10 @@ def squiggly_strip(content)
 end
 
 # Build ordered list of all create_file occurrences with their byte positions
-pattern = /create_file\s+["']([^"']+)["'][^<\n]*\n([ \t]*)<<~(\w+)\n(.*?)\n[ \t]*\3/m
+# Heredocs are single-quoted (<<~'DELIM') so content is literal — no
+# interpolation or escape processing at generation time. The '?' makes the
+# quotes optional so any legacy unquoted heredoc is still parsed.
+pattern = /create_file\s+["']([^"']+)["'][^<\n]*\n([ \t]*)<<~'?(\w+)'?\n(.*?)\n[ \t]*\3/m
 
 # For duplicate paths, only the last occurrence is authoritative (force: true wins)
 occurrences = []
@@ -69,10 +72,15 @@ last_occurrences.each do |entry|
   # so the template file itself stays readable
   indented = live_content.rstrip.gsub(/^(?=.)/, entry[:indent] + "  ")
 
-  new_block = entry[:full_match]
-    .sub(/(?<=<<~#{entry[:delim]}\n).*(?=\n[ \t]*#{entry[:delim]})/m, indented)
+  # Replace the heredoc body. Capture groups (not look-behind, which can't be
+  # variable-length for the optional quote) so <<~'DELIM' is handled, and the
+  # block form of sub so backslashes in the content (\s, \#{, ...) are inserted
+  # literally instead of being read as replacement backreferences.
+  new_block = entry[:full_match].sub(
+    /(<<~'?#{entry[:delim]}'?\n).*(\n[ \t]*#{entry[:delim]})/m
+  ) { "#{$1}#{indented}#{$2}" }
 
-  source = source.sub(entry[:full_match], new_block)
+  source = source.sub(entry[:full_match]) { new_block }
   puts "  SYNC  #{path}"
   synced += 1
 end
