@@ -38,7 +38,11 @@ gem "blueprinter"
 gem "devise"
 gem "devise-jwt"
 gem "rack-cors"
-gem "vite_rails"
+# Pinned to the tested combo. vite_ruby must be pinned too: vite_rails 3.0.19 only
+# requires "vite_ruby ~> 3.0", so it otherwise floats to 3.10.x, which fails a
+# compatibility check against the pinned vite-plugin-ruby npm package (^5.1.1).
+gem "vite_rails", "3.0.19"
+gem "vite_ruby", "3.9.1"
 gem "rename"
 gem "rswag-api"
 gem "rswag-ui"
