@@ -37,8 +37,19 @@ class AuthService {
         throw new Error(errorData.message || `Login failed with status ${response.status}`);
       }
 
-      const data: AuthResponse = await response.json();
-      return data;
+      // devise-jwt returns the JWT in the Authorization response header
+      // (as "Bearer <token>"), not in the JSON body.
+      const authHeader = response.headers.get('Authorization');
+      const token = authHeader ? authHeader.replace(/^Bearer\s+/i, '') : '';
+
+      if (!token) {
+        throw new Error('Login succeeded but no auth token was returned');
+      }
+
+      const body = await response.json().catch(() => ({}));
+      const user = body?.status?.data?.user;
+
+      return { token, user };
     } catch (error) {
       if (error instanceof Error) {
         throw new Error(error.message);
