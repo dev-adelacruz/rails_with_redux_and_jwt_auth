@@ -2626,6 +2626,10 @@ unless File.read(devise_rb).match?(/^end\s*\z/)
 end
 inject_into_file devise_rb, "\n" + jwt_config.gsub(/^(?=.)/, "  "), before: /^end\s*\z/
 
+# Treat every format as non-navigational so failed authentication returns 401
+# (JSON API) instead of a redirect / 422. Replaces devise's commented default.
+gsub_file devise_rb, /^\s*#?\s*config\.navigational_formats\s*=.*$/, "  config.navigational_formats = []"
+
 # ── Final instructions ────────────────────────────────────────
 say "", :green
 say "================================================================", :green
