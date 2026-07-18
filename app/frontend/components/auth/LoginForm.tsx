@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '../../state/store';
 import { loginUser, clearError } from '../../state/user/userSlice';
-import { tokenStorage } from '../../services/tokenStorage';
 import { Mail, Lock, ArrowRight, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
 interface LoginFormProps {
@@ -26,12 +25,9 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
     setLocalError(null);
     dispatch(clearError());
 
-    const result = await dispatch(loginUser({ email, password }));
+    const result = await dispatch(loginUser({ email, password, rememberMe }));
 
     if (loginUser.fulfilled.match(result)) {
-      tokenStorage.storeToken(result.payload.token, {
-        storageType: rememberMe ? 'local' : 'session',
-      });
       onSuccess();
     } else if (loginUser.rejected.match(result)) {
       setLocalError((result.payload as string) || 'Invalid email or password.');

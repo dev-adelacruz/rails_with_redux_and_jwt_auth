@@ -5,11 +5,13 @@ import { tokenStorage } from '../../services/tokenStorage';
 // Async thunks for authentication
 export const loginUser = createAsyncThunk(
   'user/login',
-  async (credentials: { email: string; password: string }, { rejectWithValue }) => {
+  async (credentials: { email: string; password: string; rememberMe?: boolean }, { rejectWithValue }) => {
     try {
-      const response = await authService.login(credentials);
-      // Persist the token in localStorage so the session survives a reload.
-      tokenStorage.storeToken(response.token, { storageType: 'local' });
+      const { email, password, rememberMe } = credentials;
+      const response = await authService.login({ email, password });
+      // Single source of truth for token storage. "Remember me" -> localStorage
+      // (survives restart); otherwise sessionStorage (cleared when the tab closes).
+      tokenStorage.storeToken(response.token, { storageType: rememberMe ? 'local' : 'session' });
       return response;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Login failed');

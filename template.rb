@@ -350,11 +350,13 @@ create_file "app/frontend/state/user/userSlice.tsx" do
     // Async thunks for authentication
     export const loginUser = createAsyncThunk(
       'user/login',
-      async (credentials: { email: string; password: string }, { rejectWithValue }) => {
+      async (credentials: { email: string; password: string; rememberMe?: boolean }, { rejectWithValue }) => {
         try {
-          const response = await authService.login(credentials);
-          // Persist the token in localStorage so the session survives a reload.
-          tokenStorage.storeToken(response.token, { storageType: 'local' });
+          const { email, password, rememberMe } = credentials;
+          const response = await authService.login({ email, password });
+          // Single source of truth for token storage. "Remember me" -> localStorage
+          // (survives restart); otherwise sessionStorage (cleared when the tab closes).
+          tokenStorage.storeToken(response.token, { storageType: rememberMe ? 'local' : 'session' });
           return response;
         } catch (error: any) {
           return rejectWithValue(error.message || 'Login failed');
@@ -696,7 +698,6 @@ create_file "app/frontend/components/auth/LoginForm.tsx" do
     import { useDispatch, useSelector } from 'react-redux';
     import { AppDispatch, RootState } from '../../state/store';
     import { loginUser, clearError } from '../../state/user/userSlice';
-    import { tokenStorage } from '../../services/tokenStorage';
     import { Mail, Lock, ArrowRight, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
     interface LoginFormProps {
@@ -720,12 +721,9 @@ create_file "app/frontend/components/auth/LoginForm.tsx" do
         setLocalError(null);
         dispatch(clearError());
 
-        const result = await dispatch(loginUser({ email, password }));
+        const result = await dispatch(loginUser({ email, password, rememberMe }));
 
         if (loginUser.fulfilled.match(result)) {
-          tokenStorage.storeToken(result.payload.token, {
-            storageType: rememberMe ? 'local' : 'session',
-          });
           onSuccess();
         } else if (loginUser.rejected.match(result)) {
           setLocalError((result.payload as string) || 'Invalid email or password.');
@@ -1566,7 +1564,8 @@ create_file "config/initializers/cors.rb" do
   <<~'RUBY'
     Rails.application.config.middleware.insert_before 0, Rack::Cors do
       allow do
-        origins '*' # later change to the domain of the frontend app
+        # Set ALLOWED_ORIGINS (comma-separated) in production; defaults to "*" for dev.
+        origins(*ENV.fetch('ALLOWED_ORIGINS', '*').split(',').map(&:strip))
         resource '*',
                  headers: :any,
                  methods: %i[get post put patch delete options head],
@@ -2248,7 +2247,7 @@ append_to_file "config/initializers/devise.rb" do
         jwt.revocation_requests = [
           ['DELETE', %r{^/api/v1/users/sign_out$}]
         ]
-        jwt.expiration_time = 5.minutes.to_i
+        jwt.expiration_time = ENV.fetch('JWT_EXPIRATION_MINUTES', '60').to_i.minutes.to_i
       end
     end
   RUBY

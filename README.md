@@ -358,8 +358,8 @@ For production, set the `RAILS_MASTER_KEY` environment variable.
 
 ## Production Checklist
 
-- [ ] Change `origins '*'` in `config/initializers/cors.rb` to your actual frontend domain
-- [ ] Set `jwt.expiration_time` to an appropriate value in `config/initializers/devise.rb`
+- [ ] Set `ALLOWED_ORIGINS` (comma-separated frontend domains) — CORS defaults to `*` for dev
+- [ ] Set `JWT_EXPIRATION_MINUTES` to an appropriate value — defaults to `60`
 - [ ] Set `RAILS_MASTER_KEY` in your deployment environment
 - [ ] Configure a production database in `config/database.yml`
 - [ ] Set `RAILS_ENV=production`
