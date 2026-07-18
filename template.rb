@@ -78,6 +78,11 @@ say "== Adding JS dependencies ==", :green
 run! "yarn add react@^18.1.0 react-dom@^18.0.5 react-router-dom@^7.6.2 react-redux@^9.2.0 @reduxjs/toolkit@^2.5.0 lucide-react@^0.544.0 tailwindcss@^4.1.13 @tailwindcss/vite@^4.1.13", hint: "Ensure Node.js 18+ and Yarn are installed."
 run! "yarn add --dev @vitejs/plugin-react@^4.3.4 @types/react@^18.1.0 @types/react-dom@^18.0.5 @types/styled-components@^5.1.30 typescript@^5.7.2 vite@^5.4.11 vite-plugin-ruby@^5.1.1 vite-tsconfig-paths@^5.1.4", hint: "Ensure Node.js 18+ and Yarn are installed."
 
+# ── Frontend test tooling (Vitest + Testing Library) ─────────
+say "== Adding frontend test dependencies ==", :green
+run! "yarn add --dev vitest@^2.1.8 @testing-library/react@^16.1.0 @testing-library/jest-dom@^6.6.3 @testing-library/user-event@^14.5.2 @testing-library/dom@^10.4.0 jsdom@^25.0.1", hint: "Ensure Node.js 18+ and Yarn are installed."
+run "npm pkg set scripts.test='vitest run' scripts.test:watch='vitest'"
+
 # ── vite.config.ts ───────────────────────────────────────────
 say "== Writing vite.config.ts ==", :green
 create_file "vite.config.ts", force: true do
@@ -120,7 +125,7 @@ create_file "tsconfig.json", force: true do
           "@/*": ["app/frontend/*"],
           "@api/*": ["app/frontend/api/services/*"]
         },
-        "types": ["vite/client"],
+        "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"],
         "skipLibCheck": true
       },
       "include": ["app/frontend/**/*"]
@@ -1420,6 +1425,288 @@ create_file "app/frontend/pages/home/index.tsx" do
 end
 
 # ── Rails backend ─────────────────────────────────────────────
+# ── Frontend tests (Vitest + Testing Library) ───────────
+say "== Writing frontend tests ==", :green
+create_file "vitest.config.ts" do
+  <<~'TS'
+    import { defineConfig } from 'vitest/config'
+    import react from '@vitejs/plugin-react'
+    import tsconfigPaths from 'vite-tsconfig-paths'
+
+    export default defineConfig({
+      plugins: [react(), tsconfigPaths()],
+      test: {
+        globals: true,
+        environment: 'jsdom',
+        setupFiles: './app/frontend/test/setup.ts',
+        include: ['app/frontend/**/*.{test,spec}.{ts,tsx}'],
+      },
+    })
+  TS
+end
+
+create_file "app/frontend/test/setup.ts" do
+  <<~'TS'
+    import '@testing-library/jest-dom'
+    import { afterEach } from 'vitest'
+    import { cleanup } from '@testing-library/react'
+
+    // jsdom doesn't reliably expose localStorage/sessionStorage as globals, so
+    // provide a simple in-memory implementation for tests.
+    class MemoryStorage implements Storage {
+      private store = new Map<string, string>()
+      get length() {
+        return this.store.size
+      }
+      clear() {
+        this.store.clear()
+      }
+      getItem(key: string) {
+        return this.store.has(key) ? this.store.get(key)! : null
+      }
+      key(index: number) {
+        return Array.from(this.store.keys())[index] ?? null
+      }
+      removeItem(key: string) {
+        this.store.delete(key)
+      }
+      setItem(key: string, value: string) {
+        this.store.set(key, String(value))
+      }
+    }
+
+    Object.defineProperty(globalThis, 'localStorage', { value: new MemoryStorage(), writable: true })
+    Object.defineProperty(globalThis, 'sessionStorage', { value: new MemoryStorage(), writable: true })
+
+    // Unmount React trees and reset storage between tests.
+    afterEach(() => {
+      cleanup()
+      localStorage.clear()
+      sessionStorage.clear()
+    })
+  TS
+end
+
+create_file "app/frontend/services/tokenStorage.test.ts" do
+  <<~'TS'
+    import { tokenStorage } from './tokenStorage'
+
+    describe('tokenStorage', () => {
+      it('stores and retrieves a token from localStorage', () => {
+        tokenStorage.storeToken('abc', { storageType: 'local' })
+        expect(tokenStorage.getToken()).toBe('abc')
+        expect(localStorage.getItem('auth_token')).toBe('abc')
+        expect(tokenStorage.getStorageType()).toBe('local')
+        expect(tokenStorage.hasToken()).toBe(true)
+      })
+
+      it('stores in sessionStorage (not localStorage) when storageType is session', () => {
+        tokenStorage.storeToken('xyz', { storageType: 'session' })
+        expect(sessionStorage.getItem('auth_token')).toBe('xyz')
+        expect(localStorage.getItem('auth_token')).toBeNull()
+        expect(tokenStorage.getToken()).toBe('xyz')
+      })
+
+      it('clears the token from all storage locations', () => {
+        tokenStorage.storeToken('abc', { storageType: 'local' })
+        tokenStorage.clearToken()
+        expect(tokenStorage.getToken()).toBeNull()
+        expect(tokenStorage.hasToken()).toBe(false)
+      })
+
+      it('returns null when no token is stored', () => {
+        expect(tokenStorage.getToken()).toBeNull()
+        expect(tokenStorage.hasToken()).toBe(false)
+      })
+    })
+  TS
+end
+
+create_file "app/frontend/services/authService.test.ts" do
+  <<~'TS'
+    import { authService } from './authService'
+
+    // Build a minimal fake Response for fetch mocks.
+    const mockResponse = (opts: {
+      ok?: boolean
+      status?: number
+      authHeader?: string | null
+      body?: unknown
+    }) =>
+      ({
+        ok: opts.ok ?? true,
+        status: opts.status ?? 200,
+        headers: { get: (k: string) => (k === 'Authorization' ? opts.authHeader ?? null : null) },
+        json: async () => opts.body ?? {},
+      }) as unknown as Response
+
+    afterEach(() => vi.restoreAllMocks())
+
+    describe('authService.login', () => {
+      it('reads the token from the Authorization header and the user from the body', async () => {
+        vi.stubGlobal(
+          'fetch',
+          vi.fn().mockResolvedValue(
+            mockResponse({
+              authHeader: 'Bearer a.b.c',
+              body: { status: { code: 200 }, data: { user: { id: 1, email: 'a@b.com' } } },
+            })
+          )
+        )
+        const res = await authService.login({ email: 'a@b.com', password: 'pw' })
+        expect(res.token).toBe('a.b.c')
+        expect(res.user).toEqual({ id: 1, email: 'a@b.com' })
+      })
+
+      it('throws when the response has no Authorization header (no token dispatched)', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue(mockResponse({ authHeader: null, body: {} })))
+        await expect(authService.login({ email: 'a@b.com', password: 'pw' })).rejects.toThrow(/no auth token/i)
+      })
+
+      it('throws with the server message on a non-ok response', async () => {
+        vi.stubGlobal(
+          'fetch',
+          vi.fn().mockResolvedValue(mockResponse({ ok: false, status: 401, body: { message: 'Invalid credentials' } }))
+        )
+        await expect(authService.login({ email: 'a@b.com', password: 'bad' })).rejects.toThrow('Invalid credentials')
+      })
+    })
+
+    describe('authService.validateToken', () => {
+      it('returns true when the token is valid (200)', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue(mockResponse({ ok: true, status: 200 })))
+        expect(await authService.validateToken('t')).toBe(true)
+      })
+
+      it('returns false when the token is rejected (401)', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue(mockResponse({ ok: false, status: 401 })))
+        expect(await authService.validateToken('t')).toBe(false)
+      })
+    })
+  TS
+end
+
+create_file "app/frontend/state/user/userSlice.test.ts" do
+  <<~'TS'
+    import { configureStore } from '@reduxjs/toolkit'
+    import reducer, { signOut, loginUser, logoutUser } from './userSlice'
+    import { authService } from '../../services/authService'
+    import { tokenStorage } from '../../services/tokenStorage'
+
+    vi.mock('../../services/authService', () => ({
+      authService: { login: vi.fn(), logout: vi.fn(), validateToken: vi.fn() },
+    }))
+    vi.mock('../../services/tokenStorage', () => ({
+      tokenStorage: { storeToken: vi.fn(), getToken: vi.fn(), clearToken: vi.fn() },
+    }))
+
+    const initial = { isSignedIn: false, token: null, user: null, isLoading: false, error: null }
+
+    describe('userSlice reducer', () => {
+      it('returns the initial state', () => {
+        expect(reducer(undefined, { type: '@@INIT' })).toEqual(initial)
+      })
+
+      it('signOut clears the auth state', () => {
+        const s = reducer({ ...initial, isSignedIn: true, token: 't', user: { id: 1, email: 'a' } }, signOut())
+        expect(s.isSignedIn).toBe(false)
+        expect(s.token).toBeNull()
+        expect(s.user).toBeNull()
+      })
+
+      it('loginUser.fulfilled marks the user signed in', () => {
+        const s = reducer(initial, {
+          type: loginUser.fulfilled.type,
+          payload: { token: 't', user: { id: 1, email: 'a@b.com' } },
+        })
+        expect(s.isSignedIn).toBe(true)
+        expect(s.token).toBe('t')
+        expect(s.isLoading).toBe(false)
+      })
+
+      it('loginUser.rejected records the error and stays signed out', () => {
+        const s = reducer(initial, { type: loginUser.rejected.type, payload: 'Login failed' })
+        expect(s.error).toBe('Login failed')
+        expect(s.isSignedIn).toBe(false)
+      })
+
+      it('logoutUser.fulfilled clears the auth state', () => {
+        const s = reducer({ ...initial, isSignedIn: true, token: 't' }, { type: logoutUser.fulfilled.type })
+        expect(s.isSignedIn).toBe(false)
+        expect(s.token).toBeNull()
+      })
+    })
+
+    describe('loginUser thunk storage (remember-me)', () => {
+      beforeEach(() => vi.clearAllMocks())
+
+      it('persists to sessionStorage when rememberMe is false', async () => {
+        ;(authService.login as ReturnType<typeof vi.fn>).mockResolvedValue({ token: 't', user: { id: 1, email: 'a@b.com' } })
+        const store = configureStore({ reducer: { user: reducer } })
+        await store.dispatch(loginUser({ email: 'a@b.com', password: 'pw', rememberMe: false }) as never)
+        expect(tokenStorage.storeToken).toHaveBeenCalledWith('t', { storageType: 'session' })
+        expect(store.getState().user.isSignedIn).toBe(true)
+      })
+
+      it('persists to localStorage when rememberMe is true', async () => {
+        ;(authService.login as ReturnType<typeof vi.fn>).mockResolvedValue({ token: 't', user: { id: 1, email: 'a@b.com' } })
+        const store = configureStore({ reducer: { user: reducer } })
+        await store.dispatch(loginUser({ email: 'a@b.com', password: 'pw', rememberMe: true }) as never)
+        expect(tokenStorage.storeToken).toHaveBeenCalledWith('t', { storageType: 'local' })
+      })
+    })
+  TS
+end
+
+create_file "app/frontend/components/ProtectedRoute.test.tsx" do
+  <<~'TSX'
+    import { render, screen } from '@testing-library/react'
+    import { Provider } from 'react-redux'
+    import { configureStore } from '@reduxjs/toolkit'
+    import { MemoryRouter, Routes, Route } from 'react-router-dom'
+    import userReducer from '../state/user/userSlice'
+    import ProtectedRoute from './ProtectedRoute'
+
+    const renderGuard = (userState: Partial<{ isSignedIn: boolean; isLoading: boolean }>) => {
+      const store = configureStore({
+        reducer: { user: userReducer },
+        preloadedState: {
+          user: { isSignedIn: false, token: null, user: null, isLoading: false, error: null, ...userState },
+        },
+      })
+      return render(
+        <Provider store={store}>
+          <MemoryRouter initialEntries={['/']}>
+            <Routes>
+              <Route path="/" element={<ProtectedRoute><div>Secret Dashboard</div></ProtectedRoute>} />
+              <Route path="/login" element={<div>Login Page</div>} />
+            </Routes>
+          </MemoryRouter>
+        </Provider>
+      )
+    }
+
+    describe('ProtectedRoute', () => {
+      it('renders the protected content when the user is signed in', async () => {
+        renderGuard({ isSignedIn: true, isLoading: false })
+        expect(await screen.findByText('Secret Dashboard')).toBeInTheDocument()
+      })
+
+      it('redirects to /login when the user is not signed in', async () => {
+        renderGuard({ isSignedIn: false, isLoading: false })
+        expect(await screen.findByText('Login Page')).toBeInTheDocument()
+        expect(screen.queryByText('Secret Dashboard')).not.toBeInTheDocument()
+      })
+
+      it('shows a loading state while auth is being checked', () => {
+        renderGuard({ isSignedIn: false, isLoading: true })
+        expect(screen.getByText('Loading...')).toBeInTheDocument()
+        expect(screen.queryByText('Login Page')).not.toBeInTheDocument()
+      })
+    })
+  TSX
+end
+
 say "== Setting up Rails backend ==", :green
 
 # ApplicationController

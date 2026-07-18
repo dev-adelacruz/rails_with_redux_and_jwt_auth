@@ -19,7 +19,7 @@
       "@/*": ["app/frontend/*"],
       "@api/*": ["app/frontend/api/services/*"]
     },
-    "types": ["vite/client"],
+    "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"],
     "skipLibCheck": true
   },
   "include": ["app/frontend/**/*"]
