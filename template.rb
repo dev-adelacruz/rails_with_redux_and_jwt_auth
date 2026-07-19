@@ -160,6 +160,21 @@ create_file "Procfile.dev", force: true do
   PROC
 end
 
+# ── bin/dev (Foreman launcher for Procfile.dev) ──────────────
+create_file "bin/dev", force: true do
+  <<~'DEV'
+    #!/usr/bin/env sh
+
+    if ! gem list foreman -i --silent; then
+      echo "Installing foreman..."
+      gem install foreman
+    fi
+
+    exec foreman start -f Procfile.dev "$@"
+  DEV
+end
+chmod "bin/dev", 0o755
+
 # ── Application layout ───────────────────────────────────────
 say "== Updating application layout ==", :green
 remove_file "app/views/layouts/application.html.erb"
