@@ -768,7 +768,7 @@ create_file "app/frontend/components/auth/LoginForm.tsx" do
                   required
                   disabled={isLoading}
                   placeholder="you@company.com"
-                  className="w-full pl-10 pr-4 py-2.5 text-sm text-slate-800 bg-slate-50 border border-slate-200 rounded-xl placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white focus:border-transparent transition-all duration-150 disabled:opacity-50"
+                  className="w-full pl-10 pr-4 py-2.5 text-sm text-slate-800 bg-slate-50 border border-slate-200 rounded-xl placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600 focus:bg-white focus:border-transparent transition-all duration-150 disabled:opacity-50"
                 />
               </div>
             </div>
@@ -787,7 +787,7 @@ create_file "app/frontend/components/auth/LoginForm.tsx" do
                   required
                   disabled={isLoading}
                   placeholder="••••••••"
-                  className="w-full pl-10 pr-10 py-2.5 text-sm text-slate-800 bg-slate-50 border border-slate-200 rounded-xl placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white focus:border-transparent transition-all duration-150 disabled:opacity-50"
+                  className="w-full pl-10 pr-10 py-2.5 text-sm text-slate-800 bg-slate-50 border border-slate-200 rounded-xl placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600 focus:bg-white focus:border-transparent transition-all duration-150 disabled:opacity-50"
                 />
                 <button
                   type="button"
@@ -807,11 +807,11 @@ create_file "app/frontend/components/auth/LoginForm.tsx" do
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
                   disabled={isLoading}
-                  className="w-4 h-4 text-teal-600 bg-slate-100 border-slate-300 rounded focus:ring-teal-500 focus:ring-offset-0 cursor-pointer"
+                  className="w-4 h-4 text-teal-600 bg-slate-100 border-slate-300 rounded focus:ring-teal-600 focus:ring-offset-0 cursor-pointer"
                 />
                 <span className="text-sm text-slate-600">Remember me</span>
               </label>
-              <button type="button" className="text-sm font-semibold text-teal-600 hover:text-teal-700 transition-colors duration-150">
+              <button type="button" className="text-sm font-semibold text-teal-700 hover:text-teal-800 transition-colors duration-150">
                 Forgot password?
               </button>
             </div>
@@ -819,7 +819,7 @@ create_file "app/frontend/components/auth/LoginForm.tsx" do
             <button
               type="submit"
               disabled={isLoading}
-              className="group relative flex items-center justify-center w-full px-4 py-2.5 mt-2 text-sm font-semibold text-white bg-teal-600 rounded-xl hover:bg-teal-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-150 shadow-lg shadow-teal-600/30"
+              className="group relative flex items-center justify-center w-full px-4 py-2.5 mt-2 text-sm font-semibold text-white bg-teal-700 rounded-xl hover:bg-teal-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-600 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-150 shadow-lg shadow-teal-600/30"
             >
               {isLoading ? (
                 <span className="flex items-center gap-2">
@@ -959,15 +959,15 @@ create_file "app/frontend/pages/login/index.tsx" do
             <div className="w-full max-w-sm">
               <LoginForm onSuccess={handleLoginSuccess} />
 
-              <p className="mt-8 text-center text-sm text-slate-400">
+              <p className="mt-8 text-center text-sm text-slate-500">
                 Don't have an account?{' '}
-                <button className="font-semibold text-teal-600 hover:text-teal-700 transition-colors duration-150">
+                <button className="font-semibold text-teal-700 hover:text-teal-800 transition-colors duration-150">
                   Contact your administrator
                 </button>
               </p>
             </div>
 
-            <p className="mt-12 text-xs text-slate-300">
+            <p className="mt-12 text-xs text-slate-500">
               © {new Date().getFullYear()} AppName. All rights reserved.
             </p>
           </div>
@@ -1115,7 +1115,7 @@ create_file "app/frontend/pages/home/index.tsx" do
             <Icon className={`w-5 h-5 ${iconColor}`} />
           </div>
           <span className={`inline-flex items-center gap-0.5 text-xs font-semibold px-2 py-1 rounded-full ${
-            up ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'
+            up ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
           }`}>
             {up ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
             {change}
@@ -1262,7 +1262,7 @@ create_file "app/frontend/pages/home/index.tsx" do
                 </button>
                 <div>
                   <h1 className="text-sm font-bold text-slate-900 leading-tight">Dashboard</h1>
-                  <p className="text-[11px] text-slate-400 hidden sm:block">{today}</p>
+                  <p className="text-[11px] text-slate-500 hidden sm:block">{today}</p>
                 </div>
               </div>
 
@@ -1292,7 +1292,7 @@ create_file "app/frontend/pages/home/index.tsx" do
                   {dropdownOpen && (
                     <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl border border-slate-200 shadow-xl shadow-slate-200/80 overflow-hidden z-50">
                       <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
-                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Signed in as</p>
+                        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Signed in as</p>
                         <p className="text-sm font-semibold text-slate-800 truncate mt-0.5">{user?.email}</p>
                       </div>
                       <div className="py-1">
@@ -1344,7 +1344,7 @@ create_file "app/frontend/pages/home/index.tsx" do
                   <p className="text-slate-400 text-sm mt-1.5 max-w-md">
                     Your platform is running smoothly. Here's a summary of today's activity.
                   </p>
-                  <button className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-sm font-semibold transition-all duration-150 shadow-lg shadow-teal-900/40 group">
+                  <button className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold transition-all duration-150 shadow-lg shadow-teal-900/40 group">
                     View full report
                     <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform duration-150" />
                   </button>
@@ -1365,7 +1365,7 @@ create_file "app/frontend/pages/home/index.tsx" do
                 <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
                   <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
                     <h3 className="text-sm font-bold text-slate-900">Recent Activity</h3>
-                    <button className="flex items-center gap-1 text-xs font-semibold text-teal-600 hover:text-teal-700 transition-colors group">
+                    <button className="flex items-center gap-1 text-xs font-semibold text-teal-700 hover:text-teal-800 transition-colors group">
                       View all
                       <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
                     </button>
@@ -1378,11 +1378,11 @@ create_file "app/frontend/pages/home/index.tsx" do
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold text-slate-800 truncate">{a.title}</p>
-                          <p className="text-xs text-slate-400 truncate">{a.desc}</p>
+                          <p className="text-xs text-slate-500 truncate">{a.desc}</p>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <span className={`w-1.5 h-1.5 rounded-full ${a.dot}`} />
-                          <span className="text-xs text-slate-400">{a.time}</span>
+                          <span className="text-xs text-slate-500">{a.time}</span>
                         </div>
                       </div>
                     ))}
@@ -1393,7 +1393,7 @@ create_file "app/frontend/pages/home/index.tsx" do
                 <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
                   <div className="px-6 py-4 border-b border-slate-100">
                     <h3 className="text-sm font-bold text-slate-900">Performance</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">vs. previous month</p>
+                    <p className="text-xs text-slate-500 mt-0.5">vs. previous month</p>
                   </div>
                   <div className="p-6 space-y-5">
                     {performanceMetrics.map((m) => (

@@ -109,15 +109,15 @@ const LoginPage: React.FC = () => {
         <div className="w-full max-w-sm">
           <LoginForm onSuccess={handleLoginSuccess} />
 
-          <p className="mt-8 text-center text-sm text-slate-400">
+          <p className="mt-8 text-center text-sm text-slate-500">
             Don't have an account?{' '}
-            <button className="font-semibold text-teal-600 hover:text-teal-700 transition-colors duration-150">
+            <button className="font-semibold text-teal-700 hover:text-teal-800 transition-colors duration-150">
               Contact your administrator
             </button>
           </p>
         </div>
 
-        <p className="mt-12 text-xs text-slate-300">
+        <p className="mt-12 text-xs text-slate-500">
           © {new Date().getFullYear()} AppName. All rights reserved.
         </p>
       </div>

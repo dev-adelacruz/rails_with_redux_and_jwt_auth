@@ -63,7 +63,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
               required
               disabled={isLoading}
               placeholder="you@company.com"
-              className="w-full pl-10 pr-4 py-2.5 text-sm text-slate-800 bg-slate-50 border border-slate-200 rounded-xl placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white focus:border-transparent transition-all duration-150 disabled:opacity-50"
+              className="w-full pl-10 pr-4 py-2.5 text-sm text-slate-800 bg-slate-50 border border-slate-200 rounded-xl placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600 focus:bg-white focus:border-transparent transition-all duration-150 disabled:opacity-50"
             />
           </div>
         </div>
@@ -82,7 +82,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
               required
               disabled={isLoading}
               placeholder="••••••••"
-              className="w-full pl-10 pr-10 py-2.5 text-sm text-slate-800 bg-slate-50 border border-slate-200 rounded-xl placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white focus:border-transparent transition-all duration-150 disabled:opacity-50"
+              className="w-full pl-10 pr-10 py-2.5 text-sm text-slate-800 bg-slate-50 border border-slate-200 rounded-xl placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600 focus:bg-white focus:border-transparent transition-all duration-150 disabled:opacity-50"
             />
             <button
               type="button"
@@ -102,11 +102,11 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
               checked={rememberMe}
               onChange={(e) => setRememberMe(e.target.checked)}
               disabled={isLoading}
-              className="w-4 h-4 text-teal-600 bg-slate-100 border-slate-300 rounded focus:ring-teal-500 focus:ring-offset-0 cursor-pointer"
+              className="w-4 h-4 text-teal-600 bg-slate-100 border-slate-300 rounded focus:ring-teal-600 focus:ring-offset-0 cursor-pointer"
             />
             <span className="text-sm text-slate-600">Remember me</span>
           </label>
-          <button type="button" className="text-sm font-semibold text-teal-600 hover:text-teal-700 transition-colors duration-150">
+          <button type="button" className="text-sm font-semibold text-teal-700 hover:text-teal-800 transition-colors duration-150">
             Forgot password?
           </button>
         </div>
@@ -114,7 +114,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
         <button
           type="submit"
           disabled={isLoading}
-          className="group relative flex items-center justify-center w-full px-4 py-2.5 mt-2 text-sm font-semibold text-white bg-teal-600 rounded-xl hover:bg-teal-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-150 shadow-lg shadow-teal-600/30"
+          className="group relative flex items-center justify-center w-full px-4 py-2.5 mt-2 text-sm font-semibold text-white bg-teal-700 rounded-xl hover:bg-teal-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-600 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-150 shadow-lg shadow-teal-600/30"
         >
           {isLoading ? (
             <span className="flex items-center gap-2">
