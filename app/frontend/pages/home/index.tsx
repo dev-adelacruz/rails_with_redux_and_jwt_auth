@@ -251,7 +251,7 @@ const HomePage: React.FC = () => {
               </button>
 
               {dropdownOpen && (
-                <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl border border-slate-200 shadow-xl shadow-slate-200/80 overflow-hidden z-50">
+                <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl border border-slate-200 shadow-lg shadow-slate-900/10 overflow-hidden z-50">
                   <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
                     <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Signed in as</p>
                     <p className="text-sm font-semibold text-slate-800 truncate mt-0.5">{user?.email}</p>
